@@ -45,6 +45,9 @@
     <ClInclude Include="Triangle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Light.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad.c">
@@ -53,5 +56,22 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="img\awesomeface.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="img\container.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="img\wall.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="img\container2.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="img\container2_specular.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

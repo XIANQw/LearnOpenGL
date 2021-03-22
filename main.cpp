@@ -14,7 +14,7 @@
 const float WIDTH = 800, HEIGHT = 600;
 
 Camera camera;
-bool myModel = true, vShaderLight = false;
+bool myModel = true;
 void processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -37,12 +37,6 @@ void processInput(GLFWwindow* window)
     }
     if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) {
         myModel = false;
-    }
-    if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS) {
-        vShaderLight = true;
-    }
-    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
-        vShaderLight = false;
     }
 }
 
@@ -83,21 +77,30 @@ int main()
     glm::vec3 objColor = glm::vec3(1.0f, 0.5f, 0.31f);
     glm::vec3 lightColor = glm::vec3(1.0f);
 
-    GameObj cube = GameObj::genCubeWithPosNormal();
+    GameObj cube = GameObj::genCubeWithPosNormalUV();
     cube.material.shininess = 256;
     cube.material.objColorRGBA = glm::vec4(objColor, 1.0f);
 
-    GameObj light = GameObj::genCube();
+    GameObj light = GameObj::genCubePos();
     light.material.objColorRGBA = glm::vec4(lightColor, 1.0f);
+    
+    std::vector<const char*> files{ "img/container2.png", "img/container2_specular.png" };
+    std::vector<int> wrapModes{ GL_REPEAT, GL_REPEAT };
+    std::vector<int> filteringModes{ GL_LINEAR, GL_LINEAR };
+    TextureSetter textureSetter(files, wrapModes, filteringModes);
+    auto textures = textureSetter.getTextures();
+    cube.textures = textures;
 
     Shader shader("3.3.shader.vert", "3.3.shader.frag");
-    Shader lightShader("lightShader.vert", "lightShader.frag");
     shader.use();
     shader.setVec3("material.Ka", cube.material.Ka);
     shader.setVec3("material.Kd", cube.material.Kd);
     shader.setVec3("material.Ks", cube.material.Ks);
     shader.setFloat("material.shininess", cube.material.shininess);
-    shader.setVec3("objColor", cube.material.objColorRGBA.x, cube.material.objColorRGBA.y, cube.material.objColorRGBA.z);
+    shader.setInt("material.diffuseMap", 0);
+    shader.setInt("material.specularMap", 1);
+
+    Shader lightShader("lightShader.vert", "lightShader.frag");
 
 
     std::vector<glm::vec3> cubePositions{
@@ -121,15 +124,14 @@ int main()
 
         processInput(window);
 
-
-        glClearColor(0, 0, 0, 0);
+        glClearColor(0.1, 0.1, 0.1, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+        
         glm::mat4 model = glm::mat4(1.0f);
         glm::mat4 view = glm::mat4(1.0f);
         glm::mat4 projection = glm::mat4(1.0f);
         
-        /*lightPos = glm::vec3(cubePositions[0].x + 0.8 * sin((float)glfwGetTime()), cubePositions[0].y + 1.0f, cubePositions[0].z + sin((float)glfwGetTime()));*/
+        lightPos = glm::vec3(cubePositions[0].x + 0.8 * sin((float)glfwGetTime()), cubePositions[0].y + 1.0f, cubePositions[0].z + sin((float)glfwGetTime()));
         model = glm::translate(model, lightPos);
         model = glm::scale(model, glm::vec3(0.1f));
         view = camera.getLookAt();
@@ -143,8 +145,9 @@ int main()
         lightShader.setMat4("view", view);
         lightShader.setMat4("projection", projection);
         lightShader.setVec3("lightColor", light.material.objColorRGBA.x, light.material.objColorRGBA.y, light.material.objColorRGBA.z);
+
         light.draw();
-        cube.bindTexturesToGL();
+
         shader.use();
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);
@@ -152,7 +155,8 @@ int main()
         shader.setVec3("lightColor", light.material.objColorRGBA.x, light.material.objColorRGBA.y, light.material.objColorRGBA.z);
         shader.setVec3("lightPos", lightPos);
         shader.setBool("myModel", myModel);
-        shader.setBool("vShaderLight", vShaderLight);
+
+        cube.bindTexturesToGL();
         for (int i = 0; i < cubePositions.size(); i++) {
             model = glm::mat4(1.0f);
             model = glm::translate(model, cubePositions[i]);

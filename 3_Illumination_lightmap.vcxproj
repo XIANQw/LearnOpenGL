@@ -150,6 +150,7 @@
   <ItemGroup>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="GameObj.h" />
+    <ClInclude Include="Light.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="OpenGLWindow.h" />
     <ClInclude Include="resource.h" />
@@ -160,6 +161,13 @@
   <ItemGroup>
     <ClCompile Include="glad.c" />
     <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="img\awesomeface.png" />
+    <Image Include="img\container.jpg" />
+    <Image Include="img\container2.png" />
+    <Image Include="img\container2_specular.png" />
+    <Image Include="img\wall.jpg" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
