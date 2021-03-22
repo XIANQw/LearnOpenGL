@@ -74,16 +74,10 @@ int main()
     glfwSetScrollCallback(window, scoll_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    glm::vec3 objColor = glm::vec3(1.0f, 0.5f, 0.31f);
-    glm::vec3 lightColor = glm::vec3(1.0f);
-
     Cube cube = Cube::makeCubeWithPosNormalTexcoords();
     cube.material.shininess = 256;
-    cube.material.objColorRGBA = glm::vec4(objColor, 1.0f);
 
-    //Cube light = Cube::makeCube();
-    //light.material.objColorRGBA = glm::vec4(lightColor, 1.0f);
-    myLight::PointLight light;
+    myLight::PointLight light(glm::vec3(1.0f, 1.0f, 0));
     light.p_obj = std::make_unique<GameObj>(Cube::makeCube());
     
     std::vector<const char*> files{ "img/container2.png", "img/container2_specular.png" };
@@ -95,10 +89,25 @@ int main()
 
     Shader shader("3.3.shader.vert", "3.3.shader.frag");
     shader.use();
-    shader.setVec3("pointLight.ambient", light.ambient);
-    shader.setVec3("pointLight.diffuse", light.diffuse);
-    shader.setVec3("pointLight.specular", light.specular);
-    shader.setVec3("pointLight.lightColor", light.color);
+    //shader.setVec3("pointLight.ambient", light.ambient);
+    //shader.setVec3("pointLight.diffuse", light.diffuse);
+    //shader.setVec3("pointLight.specular", light.specular);
+    //shader.setFloat("pointLight.Kc", light.Kc);
+    //shader.setFloat("pointLight.Kl", light.Kl);
+    //shader.setFloat("pointLight.Kq", light.Kq);
+    //shader.setVec3("pointLight.Pos", light.position);
+    //shader.setVec3("pointLight.Color", light.color);
+
+    shader.setVec3("spotLight.ambient", light.ambient);
+    shader.setVec3("spotLight.diffuse", light.diffuse);
+    shader.setVec3("spotLight.specular", light.specular);
+    shader.setVec3("spotLight.Color", light.color);
+    shader.setFloat("spotLight.Kc", light.Kc);
+    shader.setFloat("spotLight.Kl", light.Kl);
+    shader.setFloat("spotLight.Kq", light.Kq);
+    shader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
+
+
     shader.setFloat("material.shininess", cube.material.shininess);
     shader.setInt("material.diffuseMap", 0);
     shader.setInt("material.specularMap", 1);
@@ -107,10 +116,18 @@ int main()
 
 
     std::vector<glm::vec3> cubePositions{
-        glm::vec3(-1.0f,  -1.5f, -0.75f),
+        glm::vec3(0.0f,  0.0f,  0.0f),
+        glm::vec3(2.0f,  5.0f, -15.0f),
+        glm::vec3(-1.5f, -2.2f, -2.5f),
+        glm::vec3(-3.8f, -2.0f, -12.3f),
+        glm::vec3(2.4f, -0.4f, -3.5f),
+        glm::vec3(-1.7f,  3.0f, -7.5f),
+        glm::vec3(1.3f, -2.0f, -2.5f),
+        glm::vec3(1.5f,  2.0f, -2.5f),
+        glm::vec3(1.5f,  0.2f, -1.5f),
+        glm::vec3(-1.3f,  1.0f, -1.5f)
     };
-    glm::vec3 lightPos = glm::vec3(cubePositions[0].x + 0.8, cubePositions[0].y + 1.0f, cubePositions[0].z);
-    light.position = lightPos;
+
 
     glEnable(GL_DEPTH_TEST);
     
@@ -134,36 +151,34 @@ int main()
         glm::mat4 view = glm::mat4(1.0f);
         glm::mat4 projection = glm::mat4(1.0f);
         
-        light.position = glm::vec3(cubePositions[0].x + 0.8 * sin((float)glfwGetTime()), cubePositions[0].y + 1.0f, cubePositions[0].z + sin((float)glfwGetTime()));
+        light.position = glm::vec3(cubePositions[0].x + 0.8, cubePositions[0].y + 1.0f, cubePositions[0].z);
         model = glm::translate(model, light.position);
         model = glm::scale(model, glm::vec3(0.1f));
         view = camera.getLookAt();
         projection = glm::perspective(glm::radians(camera.getZoom()), openglWindow.width / openglWindow.height, 0.1f, 100.0f);
 
-        light.color.r = sin(glfwGetTime() * 2.0f);
-        light.color.g = sin(glfwGetTime() * 0.7f);
-        light.color.b = sin(glfwGetTime() * 1.3f);
-        lightShader.use();
-        lightShader.setMat4("model", model);
-        lightShader.setMat4("view", view);
-        lightShader.setMat4("projection", projection);
-        lightShader.setVec3("lightColor", light.color);
+        //lightShader.use();
+        //lightShader.setMat4("model", model);
+        //lightShader.setMat4("view", view);
+        //lightShader.setMat4("projection", projection);
+        //lightShader.setVec3("lightColor", light.color);
 
-        light.p_obj->draw();
+        //light.p_obj->draw();
 
         shader.use();
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);
         shader.setVec3("cameraPos", camera.cameraPos);
-        shader.setVec3("pointLight.lightColor", light.color);
-        shader.setVec3("pointLight.lightPos", light.position);
         shader.setBool("myModel", myModel);
+        shader.setVec3("spotLight.Dir", camera.cameraFront);
+        shader.setVec3("spotLight.Pos", camera.cameraPos);
+
 
         cube.bindTexturesToGL();
         for (int i = 0; i < cubePositions.size(); i++) {
             model = glm::mat4(1.0f);
             model = glm::translate(model, cubePositions[i]);
-            //model = glm::rotate(model, (float)glfwGetTime() * glm::radians(10.0f * (i+1)), glm::vec3(0.5f, 1.0f, 0.0f));
+            model = glm::rotate(model, (float)glfwGetTime() * glm::radians(10.0f * (i+1)), glm::vec3(0.5f, 1.0f, 0.0f));
             shader.setMat4("model", model);
             cube.draw();
         }

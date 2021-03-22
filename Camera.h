@@ -20,7 +20,7 @@ const float ZOOM = 45.0f;
 
 class Camera {
 	
-	glm::vec3 cameraFront;
+	
 	glm::vec3 cameraUp;
 	glm::vec3 worldUp;
 	float cameraSpeed;
@@ -32,6 +32,7 @@ class Camera {
 	
 
 public:
+	glm::vec3 cameraFront;
 	glm::vec3 cameraPos;
 	float zoom;
 
