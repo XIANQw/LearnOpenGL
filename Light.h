@@ -15,8 +15,8 @@ namespace myLight {
 		glm::vec3 diffuse;
 		glm::vec3 specular;
 
-		GameObj* obj;
-		Light() :ambient(DEFAULT_KA), diffuse(DEFAULT_KD), specular(DEFAULT_KS), obj(nullptr) {}
+		std::unique_ptr<GameObj> p_obj;
+		Light() :ambient(DEFAULT_KA), diffuse(DEFAULT_KD), specular(DEFAULT_KS) {}
 	};
 
 	struct PointLight : public Light {
