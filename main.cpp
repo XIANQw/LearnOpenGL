@@ -95,9 +95,10 @@ int main()
 
     Shader shader("3.3.shader.vert", "3.3.shader.frag");
     shader.use();
-    shader.setVec3("material.Ka", cube.material.Ka);
-    shader.setVec3("material.Kd", cube.material.Kd);
-    shader.setVec3("material.Ks", cube.material.Ks);
+    shader.setVec3("pointLight.ambient", light.ambient);
+    shader.setVec3("pointLight.diffuse", light.diffuse);
+    shader.setVec3("pointLight.specular", light.specular);
+    shader.setVec3("pointLight.lightColor", light.color);
     shader.setFloat("material.shininess", cube.material.shininess);
     shader.setInt("material.diffuseMap", 0);
     shader.setInt("material.specularMap", 1);
@@ -139,14 +140,14 @@ int main()
         view = camera.getLookAt();
         projection = glm::perspective(glm::radians(camera.getZoom()), openglWindow.width / openglWindow.height, 0.1f, 100.0f);
 
-        light.p_obj->material.objColorRGBA.x = sin(glfwGetTime() * 2.0f);
-        light.p_obj->material.objColorRGBA.y = sin(glfwGetTime() * 0.7f);
-        light.p_obj->material.objColorRGBA.z = sin(glfwGetTime() * 1.3f);
+        light.color.r = sin(glfwGetTime() * 2.0f);
+        light.color.g = sin(glfwGetTime() * 0.7f);
+        light.color.b = sin(glfwGetTime() * 1.3f);
         lightShader.use();
         lightShader.setMat4("model", model);
         lightShader.setMat4("view", view);
         lightShader.setMat4("projection", projection);
-        lightShader.setVec3("lightColor", light.p_obj->material.objColorRGBA.x, light.p_obj->material.objColorRGBA.y, light.p_obj->material.objColorRGBA.z);
+        lightShader.setVec3("lightColor", light.color);
 
         light.p_obj->draw();
 
@@ -154,8 +155,8 @@ int main()
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);
         shader.setVec3("cameraPos", camera.cameraPos);
-        shader.setVec3("lightColor", light.p_obj->material.objColorRGBA.x, light.p_obj->material.objColorRGBA.y, light.p_obj->material.objColorRGBA.z);
-        shader.setVec3("lightPos", light.position);
+        shader.setVec3("pointLight.lightColor", light.color);
+        shader.setVec3("pointLight.lightPos", light.position);
         shader.setBool("myModel", myModel);
 
         cube.bindTexturesToGL();
