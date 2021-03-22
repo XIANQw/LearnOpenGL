@@ -41,7 +41,10 @@ struct SpotLight{
     vec3 Dir;
     vec3 Color;
 
-    float cutOff;
+    float cutOff; // Inner cone
+    float outerCutOff; // Outer cone
+    
+    // light's attenuation: Ft = 1 / (Kc + Kl*d + Kq*d*d)
     float Kc;
     float Kl;
     float Kq;
@@ -62,6 +65,7 @@ vec3 computePointLight(){
     vec3 samplingSpecRes = vec3(texture(material.specularMap, Texcoord));
     // ambient
     vec3 light = pointLight.ambient * samplingDiffRes;
+    
     // diffuse
     vec3 lightDir = normalize(pointLight.Pos - FragPos);
     float distance = length(pointLight.Pos - FragPos);
@@ -85,27 +89,26 @@ vec3 computeSpotLight(){
     vec3 normal = normalize(Normal);
     vec3 lightDir = normalize(spotLight.Pos - FragPos);
     float theta = dot(lightDir, normalize(-spotLight.Dir));
-    vec3 samplingDiffRes = vec3(texture(material.diffuseMap, Texcoord));
+    float eps = spotLight.cutOff - spotLight.outerCutOff;
+    float intensity = clamp((theta - spotLight.outerCutOff) / eps, 0.0, 1.0); 
     
+    vec3 samplingDiffRes = vec3(texture(material.diffuseMap, Texcoord));
+    vec3 samplingSpecRes = vec3(texture(material.specularMap, Texcoord));
     // ambient
-    vec3 light = spotLight.ambient * samplingDiffRes;
-    if(theta > spotLight.cutOff){
-        vec3 samplingSpecRes = vec3(texture(material.specularMap, Texcoord));
-        // diffuse
-        float distance = length(pointLight.Pos - FragPos);
-        float attenuation = 1.0 / (spotLight.Kc + spotLight.Kl * distance + 
-                    pointLight.Kq * (distance * distance));
-        light += spotLight.diffuse * spotLight.Color * attenuation * max(dot(lightDir, normal), 0.0) * samplingDiffRes;
-        // specular
-        vec3 viewDir = normalize(cameraPos - FragPos);
-        if(myModel){
-            vec3 h = normalize(viewDir + lightDir);
-            light += spotLight.specular * spotLight.Color * attenuation * pow(max(dot(normal, h), 0.0), material.shininess) * samplingSpecRes;
-        } else{
-            vec3 reflectDir = reflect(-lightDir, normal);
-            light += spotLight.specular * spotLight.Color * attenuation * pow(max(dot(reflectDir, viewDir), 0.0), material.shininess) * samplingSpecRes;
-        }
-    }
+    vec3 ambient = spotLight.ambient * samplingDiffRes;
+   
+   // diffuse
+    float distance = length(pointLight.Pos - FragPos);
+    float attenuation = 1.0 / (spotLight.Kc + spotLight.Kl * distance + 
+                pointLight.Kq * (distance * distance));
+    vec3 diffuse = spotLight.diffuse * spotLight.Color * attenuation * max(dot(lightDir, normal), 0.0) * samplingDiffRes;
+    
+    // specular
+    vec3 viewDir = normalize(cameraPos - FragPos);
+    vec3 h = normalize(viewDir + lightDir);
+    vec3 specular = spotLight.specular * spotLight.Color * attenuation * pow(max(dot(normal, h), 0.0), material.shininess) * samplingSpecRes;
+    
+    vec3 light = ambient + diffuse * intensity + specular * intensity;
     return light;
 }
 

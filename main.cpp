@@ -101,12 +101,15 @@ int main()
     shader.setVec3("spotLight.ambient", light.ambient);
     shader.setVec3("spotLight.diffuse", light.diffuse);
     shader.setVec3("spotLight.specular", light.specular);
+
     shader.setVec3("spotLight.Color", light.color);
+
+    shader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
+    shader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.5f)));
+    
     shader.setFloat("spotLight.Kc", light.Kc);
     shader.setFloat("spotLight.Kl", light.Kl);
     shader.setFloat("spotLight.Kq", light.Kq);
-    shader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-
 
     shader.setFloat("material.shininess", cube.material.shininess);
     shader.setInt("material.diffuseMap", 0);
