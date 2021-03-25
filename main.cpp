@@ -169,6 +169,12 @@ int main()
     // Render loop
     while (!glfwWindowShouldClose(window))
     {
+        GLuint elapsed_time;
+        UINT32 query;
+        glGenQueries(1, &query);
+        glBeginQuery(GL_TIME_ELAPSED, query);
+
+
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
@@ -210,13 +216,23 @@ int main()
         }
 
         cube.bindTexturesToGL();
-        for (int i = 0; i < cubePositions.size(); i++) {
+        int scale = 1;
+        for (int i = 0; i < cubePositions.size()*scale; i++) {
+            int index = i % cubePositions.size();
             model = glm::mat4(1.0f);
-            model = glm::translate(model, cubePositions[i]);
-            model = glm::rotate(model, (float)glfwGetTime() * glm::radians(10.0f * (i+1)), glm::vec3(0.5f, 1.0f, 0.0f));
+            model = glm::translate(model, cubePositions[index]);
+            model = glm::rotate(model, (float)glfwGetTime() * glm::radians(10.0f * (index+1)), glm::vec3(0.5f, 1.0f, 0.0f));
             shader.setMat4("model", model);
             cube.draw();
         }
+
+        glEndQuery(GL_TIME_ELAPSED);
+        GLint getResult = 0;
+        while (!getResult) {
+            glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &getResult);
+        }
+        glGetQueryObjectuiv(query, GL_QUERY_RESULT, &elapsed_time);
+        std::cout << "Time spent on GPU:" << elapsed_time / 1000000.0 << std::endl;
 
         glfwSwapBuffers(window);
         glfwPollEvents();
