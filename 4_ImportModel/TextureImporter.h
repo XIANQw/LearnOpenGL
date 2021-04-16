@@ -29,6 +29,8 @@ namespace TextureImporter {
 		const int filteringMode = GL_LINEAR) {
 
 		Texture texture;
+		texture.type = type;
+		texture.path = filename;
 		stbi_set_flip_vertically_on_load(true);
 		unsigned char* data = nullptr;
 		

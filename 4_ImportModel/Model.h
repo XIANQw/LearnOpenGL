@@ -9,46 +9,6 @@
 #include <vector>
 #include "Mesh.h"
 
-
-uint32_t TextureFromFile(std::string path, std::string& directory) {
-    std::string filename = directory + '/' + path;
-
-    uint32_t textureID;
-    glGenTextures(1, &textureID);
-
-    int width, height, nrComponent;
-    // Binding texture 2D
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    // Set wrap and filter attributs
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // S and T direction's wrap mode: repeat
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // Min and Mag filter mode : linear
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // Load data from image
-    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponent, 0);
-    if (data) {
-        GLenum format = GL_RGB;
-        if (nrComponent == 1)
-            format = GL_RED;
-        else if (nrComponent == 3)
-            format = GL_RGB;
-        else if (nrComponent == 4)
-            format = GL_RGBA;
-        // Copy image data to texture2D
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        // Generate Mipmap
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else {
-        std::cout << "Texture " << path << " : Failed to load texture" << std::endl;
-    }
-    // Free data
-    stbi_image_free(data);
-
-    return textureID;
-}
-
 class Model {
 private:
     /*  模型数据  */
@@ -138,17 +98,15 @@ private:
             // Check whether texture was loaded
             bool skip = false;
             for (auto& tex:textures_loaded) {
-                if (std::strcmp(str.C_Str(), tex.path.data()) == 0) {
+                if (std::strcmp(str.C_Str(), tex.path.c_str()) == 0) {
                     outTextureLoaded.push_back(tex);
                     skip = true;
                     break;
                 }
             }
             if (!skip) {
-                Texture texture;
-                texture.id = TextureFromFile(str.C_Str(), this->directory);
-                texture.type = typeName;
-                texture.path = str.C_Str();
+                std::string filename = directory + "/" + std::string(str.C_Str());
+                Texture texture = TextureImporter::importTexture(filename.c_str(), typeName);
                 outTextureLoaded.push_back(texture);
                 textures_loaded.push_back(texture);
             }
