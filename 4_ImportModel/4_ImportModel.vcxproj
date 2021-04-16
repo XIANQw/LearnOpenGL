@@ -158,21 +158,13 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="Shape.h" />
-    <ClInclude Include="TextureSetter.h" />
+    <ClInclude Include="TextureImporter.h" />
     <ClInclude Include="Triangle.h" />
-    <ClInclude Include="ObjImporter.h" />
     <ClInclude Include="Vertex.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad.c" />
     <ClCompile Include="main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="img\awesomeface.png" />
-    <Image Include="img\container.jpg" />
-    <Image Include="img\container2.png" />
-    <Image Include="img\container2_specular.png" />
-    <Image Include="img\wall.jpg" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

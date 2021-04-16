@@ -6,7 +6,7 @@
 #include "Material.h"
 #include "Vertex.h"
 #include "Shader.h"
-#include "TextureSetter.h"
+#include "TextureImporter.h"
 
 template<class VertexType=VertexNormalTex>
 class Mesh {

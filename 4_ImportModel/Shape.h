@@ -69,4 +69,26 @@ namespace Shape {
 		std::vector<uint32_t> indices{};
 		return Mesh<Vertex>(vertexArr, indices);
 	}
+
+	const std::vector<float> planeVertices = {
+		// positions          // texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+		 5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
+		-5.0f, -0.5f,  5.0f,  0.0f, 0.0f,
+		-5.0f, -0.5f, -5.0f,  0.0f, 2.0f,
+
+		 5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
+		-5.0f, -0.5f, -5.0f,  0.0f, 2.0f,
+		 5.0f, -0.5f, -5.0f,  2.0f, 2.0f
+	};
+
+	Mesh<VertexNormalTex> makePlane() {
+		std::vector<VertexNormalTex> vertexArr;
+		for (size_t i = 0; i < planeVertices.size(); i += VertexTex::layout.back()) {
+			glm::vec3 pos(planeVertices[i], planeVertices[i + 1], planeVertices[i + 2]);
+			glm::vec2 tex(planeVertices[i + 3], planeVertices[i + 4]);
+			vertexArr.push_back(VertexNormalTex(pos, glm::vec3(0, 1, 0), tex));
+		}
+		std::vector<uint32_t> indices{};
+		return Mesh<VertexNormalTex>(vertexArr, indices);
+	}
 }

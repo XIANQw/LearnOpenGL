@@ -6,7 +6,7 @@
 #include "OpenGLWindow.h"
 #include "Triangle.h"
 #include "Shader.h"
-#include "TextureSetter.h"
+#include "TextureImporter.h"
 #include "Mesh.h"
 #include "Camera.h"
 #include "Light.h"
@@ -17,6 +17,7 @@ const float WIDTH = 800, HEIGHT = 600;
 
 Camera camera;
 bool useSpotLight = false;
+float deltaY = 0.0f;
 void processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -39,6 +40,14 @@ void processInput(GLFWwindow* window)
     }
     if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) {
         useSpotLight = false;
+    }
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+        deltaY += 0.01;
+        std::cout << deltaY << std::endl;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+        deltaY -= 0.01;
+        std::cout << deltaY << std::endl;
     }
 }
 
@@ -76,17 +85,18 @@ int main()
     glfwSetScrollCallback(window, scoll_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-
+    auto floor = Shape::makePlane();
+    Texture floorTexture = TextureImporter::importTexture("../img/floor.png", t_diffusemap);
+    floor.textures.push_back(floorTexture);
 
     Model gameObj("../img/nanosuit/nanosuit.obj");
-
 
     myLight::DirLight dirLight;
     std::vector<glm::vec3> pointLightPositions = {
         //glm::vec3(-0.3f,  -1.0f, -0.3f),
         //glm::vec3(0.3f,  0.5f, -0.3f),
         //glm::vec3(0.3f,  1.0f,  0.3f),
-        glm::vec3(-0.5f, -0.5f, 0.5f)
+        glm::vec3(-0.5f, 0.5f, 0.5f)
     };
     const int N_POINTLIGHTS = pointLightPositions.size();
     std::vector<myLight::PointLight*> pointLights;
@@ -96,8 +106,7 @@ int main()
     }
     myLight::SpotLight spotLight;
 
-    
-
+   
     Shader shader("3.3.shader.vert", "3.3.shader.frag");
     shader.use();
     shader.setVec3("dirLight.ambient", dirLight.ambient);
@@ -130,7 +139,7 @@ int main()
     shader.setFloat("spotLight.Kc", spotLight.Kc);
     shader.setFloat("spotLight.Kl", spotLight.Kl);
     shader.setFloat("spotLight.Kq", spotLight.Kq);
-    shader.setFloat("material.shininess", 256.0f);
+    shader.setFloat("material.shininess", floor.material.shininess);
 
 
     Shader lightShader("lightShader.vert", "lightShader.frag");
@@ -165,7 +174,7 @@ int main()
         lightShader.setMat4("projection", projection);
         for (int i = 0; i < N_POINTLIGHTS; i++) {
             model = glm::mat4(1.0f);
-            model = glm::rotate(model, float(glfwGetTime() * glm::radians(60.0f)), glm::vec3(1,1,1));
+            model = glm::rotate(model, float(glfwGetTime() * glm::radians(60.0f)), glm::vec3(0,1,0));
             model = glm::translate(model, pointLightPositions[i]);
             pointLights[i]->position = model * glm::vec4(pointLightPositions[i], 1.0f);
             model = glm::scale(model, glm::vec3(0.1f));
@@ -187,17 +196,19 @@ int main()
             shader.setVec3("pointLights[" + str_i + "].Pos", pointLights[i]->position);
         }
 
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0));
+        shader.setMat4("model", model);
+        floor.draw(shader);
 
         model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0, -1, 0));
+        model = glm::translate(model, glm::vec3(0, -0.5, 0));
         model = glm::scale(model, glm::vec3(0.1f));
         shader.setMat4("model", model);    
         gameObj.Draw(shader);
         
-
         glfwSwapBuffers(window);
         glfwPollEvents();
-
     }
 
     glfwTerminate();

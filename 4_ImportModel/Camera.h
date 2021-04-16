@@ -37,7 +37,7 @@ public:
 	float zoom;
 
 	Camera() : 
-		cameraPos(glm::vec3(0, 0, 3)),
+		cameraPos(glm::vec3(0, 0.5, 3)),
 		worldUp(glm::vec3(0.0f, 1.0f, 0.0f)),
 		cameraSpeed(2.5f), yaw(YAW), pitch(PITCH), zoom(ZOOM) {
 		updateCameraFront();
