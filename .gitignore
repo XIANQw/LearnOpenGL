@@ -1,4 +1,7 @@
+img
+.vs
+*/Debug
+*/x86
+*/x64
 */*.filters
 */*.user
-*/Debug
-img
