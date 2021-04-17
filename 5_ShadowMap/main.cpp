@@ -17,7 +17,9 @@ const float WIDTH = 800, HEIGHT = 600;
 
 Camera camera;
 bool compare = false;
+bool controlBox = true;
 float deltaY = 0.0f;
+glm::vec3 currentBoxPos = camera.cameraPos;
 void processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -40,6 +42,14 @@ void processInput(GLFWwindow* window)
     }
     if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) {
         compare = false;
+    }
+    if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS) {
+        controlBox = false;
+        currentBoxPos = camera.cameraPos + camera.cameraFront * 2.0f;
+        currentBoxPos.y = std::max(0.0f, currentBoxPos.y);
+    }
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
+        controlBox = true;
     }
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
         deltaY += 0.01;
@@ -79,7 +89,7 @@ void scoll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 
 // renders the 3D scene
 // --------------------
-inline void renderScene(const Shader& shader, Mesh<VertexNormalTex>& floor, Model& gameObj)
+inline void renderScene(const Shader& shader, Mesh<VertexNormalTex>& floor, Model& gameObj, Mesh<VertexNormalTex>& box)
 {
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::mat4(1.0f);
@@ -94,6 +104,16 @@ inline void renderScene(const Shader& shader, Mesh<VertexNormalTex>& floor, Mode
     shader.setMat4("model", model);
     shader.setBool("material.useSpecularMap", true);
     gameObj.Draw(shader);
+
+    model = glm::mat4(1.0f);
+    if (controlBox) {
+        currentBoxPos = camera.cameraPos + camera.cameraFront * 2.0f;
+        currentBoxPos.y = std::max(0.0f, currentBoxPos.y);
+    }
+    model = glm::translate(model, currentBoxPos);
+    
+    shader.setMat4("model", model);
+    box.draw(shader);
 }
 
 unsigned int quadVAO = 0;
@@ -139,10 +159,17 @@ int main()
     Texture floorTexture = TextureImporter::importTexture("../img/floor.png", t_diffusemap);
     floor.textures.push_back(floorTexture);
 
+    auto box = Shape::makeCubeWithPosNormalTexcoords();
+    Texture boxDiffTex = TextureImporter::importTexture("../img/container2.png", t_diffusemap);
+    Texture boxSpecTex = TextureImporter::importTexture("../img/container2_specular.png", t_specularmap);
+    box.textures.push_back(boxDiffTex);
+    box.textures.push_back(boxSpecTex);
+
     Model gameObj("../img/nanosuit/nanosuit.obj");
 
-    /* 为了做shadow mapping, 需要将camera放在光源位置
-       所以这里用 SpotLight 充当 Directional Light
+    /* 
+        为了做shadow mapping, 需要将camera放在光源位置
+        所以这里用 SpotLight 充当 Directional Light
     */
     myLight::SpotLight dirLight;
     dirLight.position = glm::vec3(-3, 3, 3);
@@ -161,30 +188,10 @@ int main()
     Shader simpleDepthShader("simpleDepthShader.vert", "simpleDepthShader.frag");
     //Shader debugShader("debugShader.vert", "debugShader.frag");
 
-    // Create a FB for our depthmap
-    GLuint depthMapFBO;
-    glGenFramebuffers(1, &depthMapFBO);
-    // Create a depth texutre
     const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
-    std::shared_ptr<Texture> depthMap_ptr = std::make_shared<Texture>();
-    depthMap_ptr->type = t_depthmap;
-    glGenTextures(1, &depthMap_ptr->id);
-    glBindTexture(GL_TEXTURE_2D, depthMap_ptr->id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
-        SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-    // Bind FB to pipeline and bind depth map to FB
-    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap_ptr->id, 0);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+    std::shared_ptr<Texture> depthMap_ptr = std::make_shared<Texture>(
+        TextureImporter::newDepthMap(SHADOW_WIDTH, SHADOW_HEIGHT));
+    const GLuint depthMapFBO = TextureImporter::bindDepthMapToFBO(depthMap_ptr->id);
     floor.depthMap = depthMap_ptr;
     for (auto& mesh : gameObj.meshes) {
         mesh.depthMap = depthMap_ptr;
@@ -209,7 +216,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // Render depth map
-        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glViewport(0, 0, depthMap_ptr->width, depthMap_ptr->height);
         glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
         glClear(GL_DEPTH_BUFFER_BIT);
         // Configuration shader
@@ -220,8 +227,9 @@ int main()
         glm::mat4 lightSpaceMatrix = lightProjection * lightView;
         simpleDepthShader.use();
         simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-        renderScene(simpleDepthShader, floor, gameObj);
-
+        glCullFace(GL_FRONT);
+        renderScene(simpleDepthShader, floor, gameObj, box);
+        glCullFace(GL_BACK);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         // reset viewport
@@ -229,7 +237,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         /* 
-        Draw Scene
+            Draw Scene
         */
         glm::mat4 model = glm::mat4(1.0f);
         glm::mat4 view = glm::mat4(1.0f);
@@ -259,7 +267,7 @@ int main()
         /* Set pointLight real-time info
         */
         shader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-        renderScene(shader, floor, gameObj);
+        renderScene(shader, floor, gameObj, box);
         
         glfwSwapBuffers(window);
         glfwPollEvents();

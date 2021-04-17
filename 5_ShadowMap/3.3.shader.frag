@@ -69,7 +69,7 @@ uniform vec3 cameraPos;
 uniform bool compare;
 
 
-float ShadowCalculation(vec4 fragPosLightSpace)
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 {
     // 执行透视除法
     /*
@@ -82,13 +82,29 @@ float ShadowCalculation(vec4 fragPosLightSpace)
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     // NDC 坐标转成 0-1 的UV坐标
     projCoords = projCoords * 0.5 + 0.5;
-    float closestDepth = texture(depthMap, projCoords.xy).r;
+    
     float currentDepth = projCoords.z;
     if(currentDepth > 1.0){
         return 0.0;
     }
+    float shadow = 0.0;
     float bias = 0.005;
-    float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;
+    if(compare){
+        //PCF
+        float bias = max(0.05 * (1.0 - dot(lightDir, normal)) / 2.0, 0.005);
+        vec2 texelSize = 1.0 / textureSize(depthMap, 0);
+        for(int x = -1; x <= 1; x++){
+            for(int y = -1; y <= 1; y++){
+                float pcfDepth = texture(depthMap, projCoords.xy + vec2(x, y) * texelSize).r;
+                shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+            }
+        }
+        shadow /= 9.0;
+    } else{
+        float closestDepth = texture(depthMap, projCoords.xy).r;
+        
+        shadow = currentDepth - bias > closestDepth ? 1.0f : 0.0; 
+    }
     return shadow;
 }
 
@@ -123,11 +139,11 @@ vec3 computeDirLight(vec3 samplingDiff, vec3 samplingSpec){
     vec3 viewDir = normalize(cameraPos - fs_in.FragPos);
 
     vec3 ambient = dirLight.ambient * samplingDiff;
-    vec3 diffuse = dirLight.diffuse * dirLight.Color * max(dot(normal, dir), 0.0) * samplingDiff;
+    vec3 diffuse = dirLight.Color * max(dot(normal, dir), 0.0) * samplingDiff;
     vec3 reflectDir = reflect(-dir, normal);
     vec3 specular = dirLight.specular * dirLight.Color * pow(max(dot(viewDir, reflectDir), 0.0), material.shininess) * samplingSpec;
 
-    float shadow = ShadowCalculation(fs_in.FragPosLightSpace);
+    float shadow = ShadowCalculation(fs_in.FragPosLightSpace, normal, dir);
     vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular));  
     return lighting;
 }
@@ -193,6 +209,6 @@ void main()
         samplingSpecRes = vec3(texture(material.specularMap1, fs_in.TexCoords));
     }
     vec3 viewDir = normalize(cameraPos - fs_in.FragPos);
-    FragColor = vec4(computeDirLight(samplingDiffRes, samplingSpecRes), 1.0);
-    
+    FragColor = vec4(computeDirLight(samplingDiffRes, samplingSpecRes), 1.0);    
 }
+
