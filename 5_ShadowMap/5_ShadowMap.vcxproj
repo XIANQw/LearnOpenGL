@@ -36,12 +36,18 @@
   <ItemGroup>
     <None Include="3.3.shader.frag" />
     <None Include="3.3.shader.vert" />
+    <None Include="debugShader.frag" />
+    <None Include="debugShader.vert" />
     <None Include="lightShader.frag" />
     <None Include="lightShader.vert" />
+    <None Include="simpleDepthShader.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad.c" />
     <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="simpleDepthShader.frag" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

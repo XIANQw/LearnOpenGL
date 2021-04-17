@@ -10,14 +10,14 @@
 
 template<class VertexType=VertexNormalTex>
 class Mesh {
-private:
+
+public:
 	std::vector<VertexType> vertices;
 	std::vector<uint32_t> indices;
 	uint32_t VAO, VBO, EBO;
-
-public:
 	myMaterial::Material material;
 	std::vector<Texture> textures;
+	std::shared_ptr<Texture> depthMap = nullptr;
 	
 	Mesh() = default;
 	Mesh(const std::vector<VertexType>& vertices,
@@ -57,6 +57,7 @@ public:
 
 	void draw(Shader shader) {
 		shader.use();
+		
 		uint32_t diffuseMapN = 1;
 		uint32_t specularMapN = 1;
 		for (size_t i = 0; i < textures.size(); i++) {
@@ -72,6 +73,12 @@ public:
 			}
 			glBindTexture(GL_TEXTURE_2D, textures[i].id);
 		}
+		if (depthMap != nullptr) {
+			glActiveTexture(GL_TEXTURE0 + textures.size());
+			shader.setInt("depthMap", textures.size());
+			glBindTexture(GL_TEXTURE_2D, depthMap->id);
+		}
+		
 		glBindVertexArray(VAO);
 		if (indices.size() == 0) {
 			glDrawArrays(GL_TRIANGLES, 0, vertices.size());

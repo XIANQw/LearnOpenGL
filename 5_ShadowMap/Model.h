@@ -10,13 +10,13 @@
 #include "Mesh.h"
 
 class Model {
-private:
+public:
     /*  模型数据  */
     std::vector<Mesh<VertexNormalTex>> meshes;
     std::vector<Texture> textures_loaded;
     std::string directory;
 
-public:
+
 	Model() = default;
 	Model(std::string path) {
 		loadModel(path);

@@ -77,6 +77,56 @@ void scoll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 }
 
 
+// renders the 3D scene
+// --------------------
+inline void renderScene(const Shader& shader, Mesh<VertexNormalTex>& floor, Model& gameObj)
+{
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0));
+    shader.setMat4("model", model);
+    shader.setBool("material.useSpecularMap", false);
+    floor.draw(shader);
+
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0, -0.5, 0));
+    model = glm::scale(model, glm::vec3(0.1f));
+    shader.setMat4("model", model);
+    shader.setBool("material.useSpecularMap", true);
+    gameObj.Draw(shader);
+}
+
+unsigned int quadVAO = 0;
+unsigned int quadVBO;
+void renderQuad()
+{
+    if (quadVAO == 0)
+    {
+        float quadVertices[] = {
+            // positions        // texture Coords
+            -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+             1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+             1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+        // setup plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
+
+
 int main()
 {
     OpenGLWindow openglWindow(WIDTH, HEIGHT, "LearnOpenGL");
@@ -98,21 +148,6 @@ int main()
     dirLight.position = glm::vec3(-3, 3, 3);
     dirLight.direction = glm::vec3(0) - dirLight.position;
     dirLight.p_obj = std::make_shared<Mesh<Vertex>>(Shape::makeCube());
-    //std::vector<glm::vec3> pointLightPositions = {
-    //    //glm::vec3(-0.3f,  -1.0f, -0.3f),
-    //    //glm::vec3(0.3f,  0.5f, -0.3f),
-    //    //glm::vec3(0.3f,  1.0f,  0.3f),
-    //    glm::vec3(-0.5f, 0.5f, 0.5f)
-    //};
-    //const int N_POINTLIGHTS = pointLightPositions.size();
-    //std::vector<myLight::PointLight*> pointLights;
-    //for (int i = 0; i < N_POINTLIGHTS; i++) {
-    //    myLight::PointLight* light = myLight::newPointLight(pointLightPositions[i]);
-    //    pointLights.push_back(light);
-    //}
-    //myLight::SpotLight spotLight;
-
-   
     Shader shader("3.3.shader.vert", "3.3.shader.frag");
     shader.use();
     shader.setVec3("dirLight.ambient", dirLight.ambient);
@@ -120,38 +155,40 @@ int main()
     shader.setVec3("dirLight.specular", dirLight.specular);
     shader.setVec3("dirLight.Dir", dirLight.direction);
     shader.setVec3("dirLight.Color", dirLight.color);
-
-
-    /* Set all pointLight and spotLight info
-    for (int i = 0; i < N_POINTLIGHTS; i++) {
-        std::string str_i = std::to_string(i);
-        shader.setVec3("pointLights[" + str_i + "].ambient", pointLights[i]->ambient);
-        shader.setVec3("pointLights[" + str_i + "].diffuse", pointLights[i]->diffuse);
-        shader.setVec3("pointLights[" + str_i + "].specular", pointLights[i]->specular);
-
-        shader.setFloat("pointLights[" + str_i + "].Kc", pointLights[i]->Kc);
-        shader.setFloat("pointLights[" + str_i + "].Kl", pointLights[i]->Kl);
-        shader.setFloat("pointLights[" + str_i + "].Kq", pointLights[i]->Kq);
-        shader.setVec3("pointLights[" + str_i + "].Color", pointLights[i]->color);
-    }
-
-    shader.setVec3("spotLight.ambient", spotLight.ambient);
-    shader.setVec3("spotLight.diffuse", spotLight.diffuse);
-    shader.setVec3("spotLight.specular", spotLight.specular);
-
-    shader.setVec3("spotLight.Color", spotLight.color);
-
-    shader.setFloat("spotLight.cutOff", spotLight.cutOff);
-    shader.setFloat("spotLight.outerCutOff", spotLight.outerCutOff);
-    
-    shader.setFloat("spotLight.Kc", spotLight.Kc);
-    shader.setFloat("spotLight.Kl", spotLight.Kl);
-    shader.setFloat("spotLight.Kq", spotLight.Kq);*/
     shader.setFloat("material.shininess", floor.material.shininess);
 
-
     Shader lightShader("lightShader.vert", "lightShader.frag");
+    Shader simpleDepthShader("simpleDepthShader.vert", "simpleDepthShader.frag");
+    //Shader debugShader("debugShader.vert", "debugShader.frag");
 
+    // Create a FB for our depthmap
+    GLuint depthMapFBO;
+    glGenFramebuffers(1, &depthMapFBO);
+    // Create a depth texutre
+    const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+    std::shared_ptr<Texture> depthMap_ptr = std::make_shared<Texture>();
+    depthMap_ptr->type = t_depthmap;
+    glGenTextures(1, &depthMap_ptr->id);
+    glBindTexture(GL_TEXTURE_2D, depthMap_ptr->id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+        SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    // Bind FB to pipeline and bind depth map to FB
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap_ptr->id, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    floor.depthMap = depthMap_ptr;
+    for (auto& mesh : gameObj.meshes) {
+        mesh.depthMap = depthMap_ptr;
+    }
 
     glEnable(GL_DEPTH_TEST);
     
@@ -171,12 +208,35 @@ int main()
         glClearColor(0.1, 0.1, 0.1, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
+        // Render depth map
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        // Configuration shader
+        glm::mat4 lightView = glm::lookAt(dirLight.position, glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f));
+        GLfloat near_plane = 1.0f, far_plane = 7.5f;
+        glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+        simpleDepthShader.use();
+        simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        renderScene(simpleDepthShader, floor, gameObj);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        
+        // reset viewport
+        glViewport(0, 0, openglWindow.width, openglWindow.height);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        /* 
+        Draw Scene
+        */
         glm::mat4 model = glm::mat4(1.0f);
         glm::mat4 view = glm::mat4(1.0f);
         glm::mat4 projection = glm::mat4(1.0f);
         view = camera.getLookAt();
         projection = glm::perspective(glm::radians(camera.getZoom()), openglWindow.width / openglWindow.height, 0.1f, 100.0f);
-        
+       
         lightShader.use();
         lightShader.setMat4("view", view);
         lightShader.setMat4("projection", projection);
@@ -184,13 +244,12 @@ int main()
             Draw dirLight
         */
         model = glm::mat4(1.0f);
-        //model = glm::rotate(model, float(glfwGetTime() * glm::radians(60.0f)), glm::vec3(0,1,0));
         model = glm::translate(model, dirLight.position);
         model = glm::scale(model, glm::vec3(0.1f));
         lightShader.setMat4("model", model);
         lightShader.setVec3("lightColor", dirLight.color);
         dirLight.p_obj->draw(lightShader);
-        
+
 
         shader.use();
         shader.setMat4("view", view);
@@ -198,25 +257,9 @@ int main()
         shader.setVec3("cameraPos", camera.cameraPos);
         shader.setBool("compare", compare);
         /* Set pointLight real-time info
-        shader.setVec3("spotLight.Dir", camera.cameraFront);
-        shader.setVec3("spotLight.Pos", camera.cameraPos);
-        for (size_t i = 0; i < N_POINTLIGHTS; i++) {
-            std::string str_i = std::to_string(i);
-            shader.setVec3("pointLights[" + str_i + "].Color", pointLights[i]->color);
-            shader.setVec3("pointLights[" + str_i + "].Pos", pointLights[i]->position);
-        }
         */
-
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0));
-        shader.setMat4("model", model);
-        floor.draw(shader);
-
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0, -0.5, 0));
-        model = glm::scale(model, glm::vec3(0.1f));
-        shader.setMat4("model", model);    
-        gameObj.Draw(shader);
+        shader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        renderScene(shader, floor, gameObj);
         
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -225,3 +268,5 @@ int main()
     glfwTerminate();
     return 0;
 }
+
+
