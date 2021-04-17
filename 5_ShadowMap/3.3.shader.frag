@@ -71,8 +71,8 @@ uniform bool compare;
 
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 {
-    // 执行透视除法
     /*
+                        执行透视除法
     当我们在顶点着色器输出一个裁切空间顶点位置到gl_Position时，
     OpenGL自动进行一个透视除法，将裁切空间坐标的范围-w到w转为-1到1，
     这要将x、y、z元素除以向量的w元素来实现。
@@ -91,8 +91,10 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
     float bias = 0.005;
     if(compare){
         //PCF
+        //根据光线与地面的夹角动态变化bias
         float bias = max(0.05 * (1.0 - dot(lightDir, normal)) / 2.0, 0.005);
         vec2 texelSize = 1.0 / textureSize(depthMap, 0);
+        // 对每个点的周围9个点采样，然后求均值
         for(int x = -1; x <= 1; x++){
             for(int y = -1; y <= 1; y++){
                 float pcfDepth = texture(depthMap, projCoords.xy + vec2(x, y) * texelSize).r;
