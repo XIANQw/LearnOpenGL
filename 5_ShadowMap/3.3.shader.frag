@@ -95,17 +95,17 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
         float bias = max(0.05 * (1.0 - dot(lightDir, normal)) / 2.0, 0.005);
         vec2 texelSize = 1.0 / textureSize(depthMap, 0);
         // 对每个点的周围9个点采样，然后求均值
-        for(int x = -1; x <= 1; x++){
-            for(int y = -1; y <= 1; y++){
+        for(int x = -2; x <= 2; x++){
+            for(int y = -2; y <= 2; y++){
                 float pcfDepth = texture(depthMap, projCoords.xy + vec2(x, y) * texelSize).r;
-                shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+                shadow += currentDepth - bias > pcfDepth ? 0.7 : 0.0;
             }
         }
-        shadow /= 9.0;
+        shadow /= 25.0;
     } else{
         float closestDepth = texture(depthMap, projCoords.xy).r;
         
-        shadow = currentDepth - bias > closestDepth ? 1.0f : 0.0; 
+        shadow = currentDepth - bias > closestDepth ? 0.7 : 0.0; 
     }
     return shadow;
 }
