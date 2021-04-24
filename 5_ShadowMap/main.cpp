@@ -18,7 +18,7 @@ const float WIDTH = 800, HEIGHT = 600;
 Camera camera;
 bool compare = false;
 bool controlBox = true;
-float deltaY = 0.0f;
+bool usePCF = true, usePCSS = false, useShadowmap = false;
 glm::vec3 currentBoxPos = camera.cameraPos;
 void processInput(GLFWwindow* window)
 {
@@ -51,13 +51,20 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
         controlBox = true;
     }
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-        deltaY += 0.01;
-        std::cout << deltaY << std::endl;
+    if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS) {
+        usePCF = true;
+        usePCSS = false;
+        useShadowmap = false;
     }
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-        deltaY -= 0.01;
-        std::cout << deltaY << std::endl;
+    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
+        usePCF = false;
+        usePCSS = true;
+        useShadowmap = false;
+    }
+    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
+        usePCF = false;
+        usePCSS = false;
+        useShadowmap = true;
     }
 }
 
@@ -222,7 +229,7 @@ int main()
         // Configuration shader
         glm::mat4 lightView = glm::lookAt(dirLight.position, glm::vec3(0.0f, 0.0f, 0.0f),
             glm::vec3(0.0f, 1.0f, 0.0f));
-        GLfloat near_plane = 1.0f, far_plane = 7.5f;
+        GLfloat near_plane = 1.0f, far_plane = 15.0f;
         glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
         glm::mat4 lightSpaceMatrix = lightProjection * lightView;
         simpleDepthShader.use();
@@ -264,6 +271,9 @@ int main()
         shader.setMat4("projection", projection);
         shader.setVec3("cameraPos", camera.cameraPos);
         shader.setBool("compare", compare);
+        shader.setBool("usePCF", usePCF);
+        shader.setBool("usePCSS", usePCSS);
+        shader.setBool("useShadowmap", useShadowmap);
         /* Set pointLight real-time info
         */
         shader.setMat4("lightSpaceMatrix", lightSpaceMatrix);

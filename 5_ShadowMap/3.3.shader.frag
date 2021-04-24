@@ -66,49 +66,165 @@ uniform SpotLight spotLight;
 
 uniform vec3 cameraPos;
 
-uniform bool compare;
+uniform bool usePCSS;
+uniform bool usePCF;
+uniform bool useShadowmap;
 
 
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
-{
-    /*
-                        执行透视除法
-    当我们在顶点着色器输出一个裁切空间顶点位置到gl_Position时，
-    OpenGL自动进行一个透视除法，将裁切空间坐标的范围-w到w转为-1到1，
-    这要将x、y、z元素除以向量的w元素来实现。
-    由于裁切空间的FragPosLightSpace并不会通过gl_Position传到片段着色器里，
-    我们必须自己做透视除法
-    */
-    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-    // NDC 坐标转成 0-1 的UV坐标
-    projCoords = projCoords * 0.5 + 0.5;
-    
-    float currentDepth = projCoords.z;
-    if(currentDepth > 1.0){
-        return 0.0;
-    }
-    float shadow = 0.0;
-    float bias = 0.005;
-    if(compare){
-        //PCF
-        //根据光线与地面的夹角动态变化bias
-        float bias = max(0.05 * (1.0 - dot(lightDir, normal)) / 2.0, 0.005);
-        vec2 texelSize = 1.0 / textureSize(depthMap, 0);
-        // 对每个点的周围9个点采样，然后求均值
-        for(int x = -2; x <= 2; x++){
-            for(int y = -2; y <= 2; y++){
-                float pcfDepth = texture(depthMap, projCoords.xy + vec2(x, y) * texelSize).r;
-                shadow += currentDepth - bias > pcfDepth ? 0.7 : 0.0;
-            }
-        }
-        shadow /= 25.0;
-    } else{
-        float closestDepth = texture(depthMap, projCoords.xy).r;
-        
-        shadow = currentDepth - bias > closestDepth ? 0.7 : 0.0; 
-    }
-    return shadow;
+
+// Shadow map related variables
+#define NUM_SAMPLES 20
+#define BLOCKER_SEARCH_NUM_SAMPLES NUM_SAMPLES
+#define PCF_NUM_SAMPLES NUM_SAMPLES
+#define NUM_RINGS 10
+
+#define LIGHTSIZE 0.05
+#define NEAR_PLANE 10.0
+
+#define EPS 1e-3
+#define PI 3.141592653589793
+#define PI2 6.283185307179586
+
+
+highp float rand_1to1(highp float x ) { 
+  // -1 -1
+  return fract(sin(x)*10000.0);
 }
+
+highp float rand_2to1(vec2 uv ) { 
+  // 0 - 1
+	const highp float a = 12.9898, b = 78.233, c = 43758.5453;
+	highp float dt = dot( uv.xy, vec2( a,b ) ), sn = mod( dt, PI );
+	return fract(sin(sn) * c);
+}
+
+float unpack(vec4 rgbaDepth) {
+    const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0*256.0), 1.0/(256.0*256.0*256.0));
+    return dot(rgbaDepth, bitShift);
+}
+
+vec2 poissonDisk[NUM_SAMPLES];
+
+void poissonDiskSamples( const in vec2 randomSeed) {
+
+  float ANGLE_STEP = PI2 * float( NUM_RINGS ) / float( NUM_SAMPLES );
+  float INV_NUM_SAMPLES = 1.0 / float( NUM_SAMPLES );
+
+  float angle = rand_2to1( randomSeed ) * PI2;
+  float radius = INV_NUM_SAMPLES;
+
+  float radiusStep = radius;
+
+  for( int i = 0; i < NUM_SAMPLES; i ++ ) {
+    poissonDisk[i] = vec2( cos( angle ), sin( angle ) ) * pow( radius, 0.75 );
+    radius += radiusStep;
+    angle += ANGLE_STEP;
+  }
+}
+
+void uniformDiskSamples( const in vec2 randomSeed ) {
+
+  float randNum = rand_2to1(randomSeed);
+  float sampleX = rand_1to1( randNum ) ;
+  float sampleY = rand_1to1( sampleX ) ;
+
+  float angle = sampleX * PI2;
+  float radius = sqrt(sampleY);
+
+  for( int i = 0; i < NUM_SAMPLES; i ++ ) {
+    poissonDisk[i] = vec2( radius * cos(angle) , radius * sin(angle)  );
+
+    sampleX = rand_1to1( sampleY ) ;
+    sampleY = rand_1to1( sampleX ) ;
+
+    angle = sampleX * PI2;
+    radius = sqrt(sampleY);
+  }
+}
+
+
+float findBlocker( sampler2D shadowMap, vec2 uv, float zReceiver ) {
+    float meanDepth = 0.0;
+    float texelSize = 1.0 / 2048.0;
+    // poissonDisk
+    poissonDiskSamples(uv);
+    float bias = 0.01;
+    int count = 0;
+    for(int i=0; i<PCF_NUM_SAMPLES; i++){
+    float Zocc = texture2D(shadowMap, uv + poissonDisk[i] * texelSize).r;
+    if (zReceiver - bias > Zocc){
+        meanDepth += Zocc;
+        count += 1;
+    } 
+    meanDepth += Zocc;
+    }
+    if(count == 0) return 0.0;
+    return meanDepth / float(count);
+}
+
+
+float PCF(sampler2D shadowMap, vec3 coords, float filterSize) {
+ 
+  float visibility = 0.0;
+  float bias = 0.01;
+  if(coords.z > 1.0){
+    return 0.0;
+  }
+  // 周围两圈采样
+  // for(int x=-2; x<=2; x++){
+  //   for(int y=-2; y<=2; y++){
+  //     float Zocc = texture2D(shadowMap, coords.xy + vec2(x, y) * filterSize).r;
+  //     visibility += coords.z - bias > Zocc ? 0.0 : 1.0;
+  //   }
+  // }
+  // visibility /= 25.0;
+
+  // poissonDisk
+  poissonDiskSamples(coords.xy);
+  for(int i=0; i<PCF_NUM_SAMPLES; i++){
+    float Zooc = texture2D(shadowMap, coords.xy + filterSize * poissonDisk[i]).r;
+    visibility += coords.z - bias > Zooc ? 0.0 : 1.0;
+  }
+
+  // uniformDisk
+  // uniformDiskSamples(coords.xy);
+  // for(int i=0; i<PCF_NUM_SAMPLES; i++){
+  //   float Zooc = texture2D(shadowMap, coords.xy + poissonDisk[i] * filterSize).r;
+  //   visibility += coords.z - bias > Zooc ? 0.0 : 1.0;
+  // }
+
+  visibility /= float(PCF_NUM_SAMPLES);  
+  return visibility;
+}
+
+
+float PCSS(sampler2D shadowMap, vec3 coords){
+  float zReceiver = coords.z;
+  float bias = 0.01;
+  // STEP 1: avgblocker depth
+  float avgblockerDepth = findBlocker(shadowMap, coords.xy, zReceiver);
+  // Early out if no blocker found
+  if(avgblockerDepth == 0.0) {
+    return 1.0;
+  }
+
+  // STEP 2: penumbra size
+  // penumbraRatio / Wlight = (Zrec - Zocc) / Zocc;
+  float penumbraRatio = (zReceiver - avgblockerDepth) / avgblockerDepth * LIGHTSIZE;
+  // STEP 3: filtering
+  float visibility = PCF(shadowMap, coords, penumbraRatio);
+  return visibility;
+
+}
+
+
+float useShadowMap(sampler2D shadowMap, vec3 shadowCoord){
+  float Zocc = texture2D(shadowMap, shadowCoord.xy).r;
+  float bias = 0.01;
+  float visibility = shadowCoord.z - bias > Zocc ? 0.0: 1.0;
+  return visibility;
+}
+
 
 float getCurrentDepth(vec4 fragPosLightSpace)
 {
@@ -135,7 +251,7 @@ float getClosestDepth(vec4 fragPosLightSpace)
     return closestDepth;
 }
 
-vec3 computeDirLight(vec3 samplingDiff, vec3 samplingSpec){
+vec3 blinPhong(vec3 coords, vec3 samplingDiff, vec3 samplingSpec, float visibility){
     vec3 dir = normalize(-dirLight.Dir);
     vec3 normal = normalize(fs_in.Normal);
     vec3 viewDir = normalize(cameraPos - fs_in.FragPos);
@@ -145,72 +261,39 @@ vec3 computeDirLight(vec3 samplingDiff, vec3 samplingSpec){
     vec3 reflectDir = reflect(-dir, normal);
     vec3 specular = dirLight.specular * dirLight.Color * pow(max(dot(viewDir, reflectDir), 0.0), material.shininess) * samplingSpec;
 
-    float shadow = ShadowCalculation(fs_in.FragPosLightSpace, normal, dir);
-    vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular));  
-    return lighting;
+
+    vec3 color = ambient + visibility * (diffuse + specular);  
+    return color;
 }
 
-vec3 computePointLight(PointLight pointLight, vec3 viewDir, vec3 samplingDiff, vec3 samplingSpec){
-    vec3 normal = normalize(fs_in.Normal);
-
-    // ambient
-    vec3 ambient = pointLight.ambient * samplingDiff;
-    
-    // diffuse
-    vec3 lightDir = normalize(pointLight.Pos - fs_in.FragPos);
-    vec3 diffuse = pointLight.diffuse * pointLight.Color * max(dot(lightDir, normal), 0.0) * samplingDiff;
-    
-    // specular
-    vec3 reflectDir = reflect(-lightDir, normal);
-    vec3 specular = pointLight.specular * pointLight.Color * pow(max(dot(reflectDir, viewDir), 0.0), material.shininess) * samplingSpec;
-   
-    float distance = length(pointLight.Pos - fs_in.FragPos);
-    float attenuation = 1.0 / (pointLight.Kc + pointLight.Kl * distance + 
-                pointLight.Kq * (distance * distance));
-    ambient *= attenuation;
-    diffuse *= attenuation;
-    specular *= attenuation;
-
-    return ambient + diffuse + specular;
-}
-
-
-vec3 computeSpotLight(SpotLight spotLight, vec3 viewDir, vec3 samplingDiff, vec3 samplingSpec){
-    vec3 normal = normalize(fs_in.Normal);
-    vec3 lightDir = normalize(spotLight.Pos - fs_in.FragPos);
-    float theta = dot(lightDir, normalize(-spotLight.Dir));
-    float eps = spotLight.cutOff - spotLight.outerCutOff;
-    float intensity = clamp((theta - spotLight.outerCutOff) / eps, 0.0, 1.0); 
-    
-    // ambient
-    vec3 ambient = spotLight.ambient * samplingDiff;
-   
-   // diffuse
-    vec3 diffuse = spotLight.diffuse * spotLight.Color * max(dot(lightDir, normal), 0.0) * samplingDiff;
-    
-    // specular
-    vec3 h = normalize(viewDir + lightDir);
-    vec3 specular = spotLight.specular * spotLight.Color * pow(max(dot(normal, h), 0.0), material.shininess) * samplingSpec;
-    
-    float distance = length(spotLight.Pos - fs_in.FragPos);
-    float attenuation = 1.0 / (spotLight.Kc + spotLight.Kl * distance + 
-                spotLight.Kq * (distance * distance));
-    ambient *= attenuation;
-    diffuse *= attenuation * intensity;
-    specular *= attenuation * intensity;
-
-    return ambient + diffuse + specular;
-}
-
+#define USE_PCF 0
+#define USE_PCSS 1
 
 void main()
 {
+    vec3 projCoords = fs_in.FragPosLightSpace.xyz / fs_in.FragPosLightSpace.w;
+    // NDC 坐标转成 0-1 的UV坐标
+    projCoords = projCoords * 0.5 + 0.5;
+
+
     vec3 samplingDiffRes = vec3(texture(material.diffuseMap1, fs_in.TexCoords));
     vec3 samplingSpecRes = vec3(0.2);
     if(material.useSpecularMap){
         samplingSpecRes = vec3(texture(material.specularMap1, fs_in.TexCoords));
     }
     vec3 viewDir = normalize(cameraPos - fs_in.FragPos);
-    FragColor = vec4(computeDirLight(samplingDiffRes, samplingSpecRes), 1.0);    
+    float texSize = 1.0 / textureSize(depthMap, 0).x;
+
+    float visibility = 1.0;
+    if (usePCF) {
+        visibility = PCF(depthMap, projCoords, texSize);
+    } else if (usePCSS){
+        visibility = PCSS(depthMap, projCoords);
+    } else {
+        visibility = useShadowMap(depthMap, projCoords);
+    }
+    vec3 color = blinPhong(projCoords, samplingDiffRes, samplingSpecRes, visibility);
+
+    FragColor = vec4(color, 1.0);    
 }
 
