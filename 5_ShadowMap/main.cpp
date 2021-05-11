@@ -17,9 +17,9 @@ const float WIDTH = 800, HEIGHT = 600;
 
 Camera camera;
 bool compare = false;
-bool controlBox = true;
+bool controlBox = false;
 bool usePCF = true, usePCSS = false, useShadowmap = false;
-glm::vec3 currentBoxPos = camera.cameraPos;
+glm::vec3 currentBoxPos = glm::vec3(-2.0f, 0.0f, 2.0f);
 void processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -46,22 +46,21 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS) {
         controlBox = false;
         currentBoxPos = camera.cameraPos + camera.cameraFront * 2.0f;
-        currentBoxPos.y = std::max(0.0f, currentBoxPos.y);
     }
     if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
         controlBox = true;
     }
-    if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS) {
+    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) { // PCF
         usePCF = true;
         usePCSS = false;
         useShadowmap = false;
     }
-    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
+    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) { // PCSS
         usePCF = false;
         usePCSS = true;
         useShadowmap = false;
     }
-    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
+    if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) { // Simple Shadowmapping
         usePCF = false;
         usePCSS = false;
         useShadowmap = true;
@@ -100,7 +99,7 @@ inline void renderScene(const Shader& shader, Mesh<VertexNormalTex>& floor, Mode
 {
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0));
+    model = glm::translate(model, glm::vec3(0, 0, 0));
     shader.setMat4("model", model);
     shader.setBool("material.useSpecularMap", false);
     floor.draw(shader);
@@ -115,7 +114,6 @@ inline void renderScene(const Shader& shader, Mesh<VertexNormalTex>& floor, Mode
     model = glm::mat4(1.0f);
     if (controlBox) {
         currentBoxPos = camera.cameraPos + camera.cameraFront * 2.0f;
-        currentBoxPos.y = std::max(0.0f, currentBoxPos.y);
     }
     model = glm::translate(model, currentBoxPos);
     
@@ -178,18 +176,20 @@ int main()
         为了做shadow mapping, 需要将camera放在光源位置
         所以这里用 SpotLight 充当 Directional Light
     */
-    myLight::SpotLight dirLight;
-    dirLight.position = glm::vec3(-3, 3, 3);
-    dirLight.direction = glm::vec3(0) - dirLight.position;
+    myLight::PointLight dirLight;
+    dirLight.position = glm::vec3(-4, 3, 4);
     dirLight.p_obj = std::make_shared<Mesh<Vertex>>(Shape::makeCube());
     Shader shader("3.3.shader.vert", "3.3.shader.frag");
     shader.use();
-    shader.setVec3("dirLight.ambient", dirLight.ambient);
-    shader.setVec3("dirLight.diffuse", dirLight.diffuse);
-    shader.setVec3("dirLight.specular", dirLight.specular);
-    shader.setVec3("dirLight.Dir", dirLight.direction);
-    shader.setVec3("dirLight.Color", dirLight.color);
+    shader.setVec3("light.ambient", dirLight.ambient);
+    shader.setVec3("light.diffuse", dirLight.diffuse);
+    shader.setVec3("light.specular", dirLight.specular);
+    shader.setVec3("light.Color", dirLight.color);
+    shader.setVec3("light.Pos", dirLight.position);
     shader.setFloat("material.shininess", floor.material.shininess);
+
+    camera.cameraPos = dirLight.position;
+    camera.cameraFront = glm::normalize(glm::vec3(0.0f) - camera.cameraPos);
 
     Shader lightShader("lightShader.vert", "lightShader.frag");
     Shader simpleDepthShader("simpleDepthShader.vert", "simpleDepthShader.frag");
@@ -205,7 +205,7 @@ int main()
     }
 
     glEnable(GL_DEPTH_TEST);
-    
+
     float deltaTime = 0.0f; // 当前帧与上一帧的时间差
     float lastFrame = 0.0f; // 上一帧的时间
 
@@ -229,8 +229,8 @@ int main()
         // Configuration shader
         glm::mat4 lightView = glm::lookAt(dirLight.position, glm::vec3(0.0f, 0.0f, 0.0f),
             glm::vec3(0.0f, 1.0f, 0.0f));
-        GLfloat near_plane = 1.0f, far_plane = 15.0f;
-        glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+        GLfloat near_plane = 0.0f, far_plane = 15.0f;
+        glm::mat4 lightProjection = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
         glm::mat4 lightSpaceMatrix = lightProjection * lightView;
         simpleDepthShader.use();
         simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);

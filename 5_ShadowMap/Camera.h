@@ -72,8 +72,8 @@ public:
 	}
 
 	glm::mat4 getLookAt() {
-		//return glm::lookAt(cameraPos, cameraPos + cameraFront, worldUp);
-		return computeViewMat(cameraPos, cameraPos + cameraFront, worldUp);
+		return glm::lookAt(cameraPos, cameraPos + cameraFront, worldUp);
+		//return computeViewMat(cameraPos, cameraPos + cameraFront, worldUp);
 	}
 
 	void updateYawPitch(float xoffset, float yoffset) {

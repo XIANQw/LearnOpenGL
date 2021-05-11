@@ -59,10 +59,10 @@ struct SpotLight{
 uniform sampler2D depthMap;
 uniform Material material;
 
-uniform DirLight dirLight;
 #define N_POINTLIGHT 1
-uniform PointLight pointLights[N_POINTLIGHT];
-uniform SpotLight spotLight;
+#define GAMMA 2.2
+
+uniform PointLight light;
 
 uniform vec3 cameraPos;
 
@@ -72,13 +72,14 @@ uniform bool useShadowmap;
 
 
 
+
 // Shadow map related variables
-#define NUM_SAMPLES 20
+#define NUM_SAMPLES 50
 #define BLOCKER_SEARCH_NUM_SAMPLES NUM_SAMPLES
 #define PCF_NUM_SAMPLES NUM_SAMPLES
 #define NUM_RINGS 10
 
-#define LIGHTSIZE 0.05
+#define LIGHTSIZE 0.04
 #define NEAR_PLANE 10.0
 
 #define EPS 1e-3
@@ -143,30 +144,28 @@ void uniformDiskSamples( const in vec2 randomSeed ) {
 }
 
 
-float findBlocker( sampler2D shadowMap, vec2 uv, float zReceiver ) {
+float findBlocker( sampler2D shadowMap, vec2 uv, float zReceiver, float bias) {
     float meanDepth = 0.0;
-    float texelSize = 1.0 / 2048.0;
+    float searchSize = (zReceiver - 0.1) / zReceiver * LIGHTSIZE;
+//    float searchSize = LIGHTSIZE / 2.0;
     // poissonDisk
     poissonDiskSamples(uv);
-    float bias = 0.01;
     int count = 0;
     for(int i=0; i<PCF_NUM_SAMPLES; i++){
-    float Zocc = texture2D(shadowMap, uv + poissonDisk[i] * texelSize).r;
-    if (zReceiver - bias > Zocc){
-        meanDepth += Zocc;
-        count += 1;
-    } 
-    meanDepth += Zocc;
+        float Zocc = texture2D(shadowMap, uv + poissonDisk[i] * searchSize).r;
+        if (zReceiver - bias > Zocc){
+            meanDepth += Zocc;
+            count += 1;
+        }
     }
-    if(count == 0) return 0.0;
-    return meanDepth / float(count);
+    if(count > 0) return meanDepth / float(count);
+    return 0.0;
 }
 
 
-float PCF(sampler2D shadowMap, vec3 coords, float filterSize) {
+float PCF(sampler2D shadowMap, vec3 coords, float filterSize, float bias) {
  
   float visibility = 0.0;
-  float bias = 0.01;
   if(coords.z > 1.0){
     return 0.0;
   }
@@ -198,11 +197,13 @@ float PCF(sampler2D shadowMap, vec3 coords, float filterSize) {
 }
 
 
-float PCSS(sampler2D shadowMap, vec3 coords){
+float PCSS(sampler2D shadowMap, vec3 coords, float bias){
   float zReceiver = coords.z;
-  float bias = 0.01;
+    if(zReceiver > 1.0){
+    return 0.0;
+  }
   // STEP 1: avgblocker depth
-  float avgblockerDepth = findBlocker(shadowMap, coords.xy, zReceiver);
+  float avgblockerDepth = findBlocker(shadowMap, coords.xy, zReceiver, bias);
   // Early out if no blocker found
   if(avgblockerDepth == 0.0) {
     return 1.0;
@@ -212,15 +213,14 @@ float PCSS(sampler2D shadowMap, vec3 coords){
   // penumbraRatio / Wlight = (Zrec - Zocc) / Zocc;
   float penumbraRatio = (zReceiver - avgblockerDepth) / avgblockerDepth * LIGHTSIZE;
   // STEP 3: filtering
-  float visibility = PCF(shadowMap, coords, penumbraRatio);
+  float visibility = PCF(shadowMap, coords, penumbraRatio, bias);
   return visibility;
 
 }
 
 
-float useShadowMap(sampler2D shadowMap, vec3 shadowCoord){
+float useShadowMap(sampler2D shadowMap, vec3 shadowCoord, float bias){
   float Zocc = texture2D(shadowMap, shadowCoord.xy).r;
-  float bias = 0.01;
   float visibility = shadowCoord.z - bias > Zocc ? 0.0: 1.0;
   return visibility;
 }
@@ -252,17 +252,17 @@ float getClosestDepth(vec4 fragPosLightSpace)
 }
 
 vec3 blinPhong(vec3 coords, vec3 samplingDiff, vec3 samplingSpec, float visibility){
-    vec3 dir = normalize(-dirLight.Dir);
+//    samplingDiff *= pow(samplingDiff, vec3(GAMMA));
+    vec3 dir = normalize(light.Pos - fs_in.FragPos);
     vec3 normal = normalize(fs_in.Normal);
     vec3 viewDir = normalize(cameraPos - fs_in.FragPos);
 
-    vec3 ambient = dirLight.ambient * samplingDiff;
-    vec3 diffuse = dirLight.Color * max(dot(normal, dir), 0.0) * samplingDiff;
+    vec3 ambient = light.ambient * samplingDiff;
+    vec3 diffuse = light.Color * max(dot(normal, dir), 0.0) * samplingDiff;
     vec3 reflectDir = reflect(-dir, normal);
-    vec3 specular = dirLight.specular * dirLight.Color * pow(max(dot(viewDir, reflectDir), 0.0), material.shininess) * samplingSpec;
-
-
+    vec3 specular = light.specular * light.Color * pow(max(dot(viewDir, reflectDir), 0.0), material.shininess) * samplingSpec;
     vec3 color = ambient + visibility * (diffuse + specular);  
+//    color = pow(color, vec3(1.0 / GAMMA));
     return color;
 }
 
@@ -284,13 +284,16 @@ void main()
     vec3 viewDir = normalize(cameraPos - fs_in.FragPos);
     float texSize = 1.0 / textureSize(depthMap, 0).x;
 
+    vec3 dir = normalize(light.Pos - fs_in.FragPos);
+    vec3 normal = normalize(fs_in.Normal);
+    float bias = max(0.01 * (1.0 - dot(normal, dir)), 0.005);
     float visibility = 1.0;
     if (usePCF) {
-        visibility = PCF(depthMap, projCoords, texSize);
+        visibility = PCF(depthMap, projCoords, texSize, bias);
     } else if (usePCSS){
-        visibility = PCSS(depthMap, projCoords);
+        visibility = PCSS(depthMap, projCoords, bias);
     } else {
-        visibility = useShadowMap(depthMap, projCoords);
+        visibility = useShadowMap(depthMap, projCoords, bias);
     }
     vec3 color = blinPhong(projCoords, samplingDiffRes, samplingSpecRes, visibility);
 
