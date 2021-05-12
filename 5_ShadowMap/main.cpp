@@ -19,6 +19,8 @@ Camera camera;
 bool compare = false;
 bool controlBox = true;
 bool usePCF = true, usePCSS = false, useShadowmap = false;
+int filtermode = 0;
+bool filtermodeDirty = false;
 glm::vec3 currentBoxPos = camera.cameraPos;
 void processInput(GLFWwindow* window)
 {
@@ -51,21 +53,34 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
         controlBox = true;
     }
-    if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS) {
-        usePCF = true;
-        usePCSS = false;
-        useShadowmap = false;
-    }
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
         usePCF = false;
         usePCSS = true;
         useShadowmap = false;
     }
     if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
+        usePCF = true;
+        usePCSS = false;
+        useShadowmap = false;
+    }
+    if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) {
         usePCF = false;
         usePCSS = false;
         useShadowmap = true;
     }
+
+	if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) {
+        filtermode = 0;
+        filtermodeDirty = true;
+	}
+	if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS) {
+        filtermode = 1;
+        filtermodeDirty = true;
+	}
+	if (glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS) {
+        filtermode = 2;
+        filtermodeDirty = true;
+	}
 }
 
 bool firstMouse = true;
@@ -178,17 +193,16 @@ int main()
         为了做shadow mapping, 需要将camera放在光源位置
         所以这里用 SpotLight 充当 Directional Light
     */
-    myLight::SpotLight dirLight;
-    dirLight.position = glm::vec3(-3, 3, 3);
-    dirLight.direction = glm::vec3(0) - dirLight.position;
-    dirLight.p_obj = std::make_shared<Mesh<Vertex>>(Shape::makeCube());
+    myLight::PointLight light;
+    light.position = glm::vec3(-4, 3, 4);
+    light.p_obj = std::make_shared<Mesh<Vertex>>(Shape::makeCube());
     Shader shader("3.3.shader.vert", "3.3.shader.frag");
     shader.use();
-    shader.setVec3("dirLight.ambient", dirLight.ambient);
-    shader.setVec3("dirLight.diffuse", dirLight.diffuse);
-    shader.setVec3("dirLight.specular", dirLight.specular);
-    shader.setVec3("dirLight.Dir", dirLight.direction);
-    shader.setVec3("dirLight.Color", dirLight.color);
+    shader.setVec3("light.ambient", light.ambient);
+    shader.setVec3("light.diffuse", light.diffuse);
+    shader.setVec3("light.specular", light.specular);
+    shader.setVec3("light.Pos", light.position);
+    shader.setVec3("light.Color", light.color);
     shader.setFloat("material.shininess", floor.material.shininess);
 
     Shader lightShader("lightShader.vert", "lightShader.frag");
@@ -227,10 +241,10 @@ int main()
         glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
         glClear(GL_DEPTH_BUFFER_BIT);
         // Configuration shader
-        glm::mat4 lightView = glm::lookAt(dirLight.position, glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::mat4 lightView = glm::lookAt(light.position, glm::vec3(0.0f, 0.0f, 0.0f),
             glm::vec3(0.0f, 1.0f, 0.0f));
         GLfloat near_plane = 1.0f, far_plane = 15.0f;
-        glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+        glm::mat4 lightProjection = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
         glm::mat4 lightSpaceMatrix = lightProjection * lightView;
         simpleDepthShader.use();
         simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
@@ -256,14 +270,14 @@ int main()
         lightShader.setMat4("view", view);
         lightShader.setMat4("projection", projection);
         /* 
-            Draw dirLight
+            Draw light
         */
         model = glm::mat4(1.0f);
-        model = glm::translate(model, dirLight.position);
+        model = glm::translate(model, light.position);
         model = glm::scale(model, glm::vec3(0.1f));
         lightShader.setMat4("model", model);
-        lightShader.setVec3("lightColor", dirLight.color);
-        dirLight.p_obj->draw(lightShader);
+        lightShader.setVec3("lightColor", light.color);
+        light.p_obj->draw(lightShader);
 
 
         shader.use();
@@ -274,6 +288,10 @@ int main()
         shader.setBool("usePCF", usePCF);
         shader.setBool("usePCSS", usePCSS);
         shader.setBool("useShadowmap", useShadowmap);
+        if (filtermodeDirty) {
+            shader.setInt("filtermode", filtermode);
+            filtermodeDirty = false;
+        }
         /* Set pointLight real-time info
         */
         shader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
