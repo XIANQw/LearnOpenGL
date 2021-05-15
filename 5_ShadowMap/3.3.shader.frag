@@ -74,7 +74,7 @@ uniform int filtermode;
 
 
 // Shadow map related variables
-#define NUM_SAMPLES 8
+#define NUM_SAMPLES 16
 #define BLOCKER_SEARCH_NUM_SAMPLES NUM_SAMPLES
 #define PCF_NUM_SAMPLES NUM_SAMPLES
 #define NUM_RINGS 10
@@ -287,9 +287,8 @@ void main()
     vec3 viewDir = normalize(cameraPos - fs_in.FragPos);
     vec3 lightDir = normalize(light.Pos);
     vec3 normal = normalize(fs_in.Normal);
-    float texSize = 1.0 / textureSize(depthMap, 0).x;
+    float texSize = 4.0 / textureSize(depthMap, 0).x;
     float bias = max(0.01 * (1.0 - dot(normal, lightDir)), 0.004);
-//    float bias = 0.0;
     float visibility = 1.0;
     if (usePCF) {
         visibility = PCF(depthMap, projCoords, texSize, bias);

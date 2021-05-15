@@ -3,6 +3,8 @@
 #include <iostream>
 #include <Windows.h>
 
+#include "MyMacros.h"
+
 #include "OpenGLWindow.h"
 #include "Triangle.h"
 #include "Shader.h"
@@ -116,25 +118,25 @@ inline void renderScene(const Shader& shader, Mesh<VertexNormalTex>& floor, Mode
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0));
-    shader.setMat4("model", model);
-    shader.setBool("material.useSpecularMap", false);
+    shader.setMat4(MY_MATRIX_MODEL, model);
+    shader.setBool(MY_MATERIAL_USE_SPECULARMAP, false);
     floor.draw(shader);
 
     model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0, -0.5, 0));
     model = glm::scale(model, glm::vec3(0.1f));
-    shader.setMat4("model", model);
-    shader.setBool("material.useSpecularMap", true);
+    shader.setMat4(MY_MATRIX_MODEL, model);
+    shader.setBool(MY_MATERIAL_USE_SPECULARMAP, true);
     gameObj.Draw(shader);
 
-    model = glm::mat4(1.0f);
+    model = glm::mat4(1.0f); 
     if (controlBox) {
         currentBoxPos = camera.cameraPos + camera.cameraFront * 2.0f;
         currentBoxPos.y = std::max(0.0f, currentBoxPos.y);
     }
     model = glm::translate(model, currentBoxPos);
     
-    shader.setMat4("model", model);
+    shader.setMat4(MY_MATRIX_MODEL, model);
     box.draw(shader);
 }
 
@@ -171,7 +173,7 @@ void renderQuad()
 
 int main()
 {
-    OpenGLWindow openglWindow(WIDTH, HEIGHT, "LearnOpenGL");
+    OpenGLWindow openglWindow(WIDTH, HEIGHT, MY_TITLE);
     auto window = openglWindow.getWindow();
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scoll_callback);
@@ -196,17 +198,17 @@ int main()
     myLight::PointLight light;
     light.position = glm::vec3(-4, 3, 4);
     light.p_obj = std::make_shared<Mesh<Vertex>>(Shape::makeCube());
-    Shader shader("3.3.shader.vert", "3.3.shader.frag");
+    Shader shader(MY_SHADER_MAIN_VERT, MY_SHADER_MAIN_FRAG);
     shader.use();
-    shader.setVec3("light.ambient", light.ambient);
-    shader.setVec3("light.diffuse", light.diffuse);
-    shader.setVec3("light.specular", light.specular);
-    shader.setVec3("light.Pos", light.position);
-    shader.setVec3("light.Color", light.color);
-    shader.setFloat("material.shininess", floor.material.shininess);
+    shader.setVec3(MY_POINTLIGHT_AMBIENT, light.ambient);
+    shader.setVec3(MY_POINTLIGHT_DIFFUSE, light.diffuse);
+    shader.setVec3(MY_POINTLIGHT_SPECULAR, light.specular);
+    shader.setVec3(MY_POINTLIGHT_POS, light.position);
+    shader.setVec3(MY_POINTLIGHT_COLOR, light.color);
+    shader.setFloat(MY_MATERIAL_SHININESS, floor.material.shininess);
 
-    Shader lightShader("lightShader.vert", "lightShader.frag");
-    Shader simpleDepthShader("simpleDepthShader.vert", "simpleDepthShader.frag");
+    Shader lightShader(MY_SHADER_LIGHT_VERT, MY_SHADER_LIGHT_FRAG);
+    Shader simpleDepthShader(MY_SHADER_DEPTHMAP_VERT, MY_SHADER_DEPTHMAP_FRAG);
     //Shader debugShader("debugShader.vert", "debugShader.frag");
 
     const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
@@ -247,7 +249,8 @@ int main()
         glm::mat4 lightProjection = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
         glm::mat4 lightSpaceMatrix = lightProjection * lightView;
         simpleDepthShader.use();
-        simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        simpleDepthShader.setMat4(MY_MATRIX_VIEW, lightView);
+        simpleDepthShader.setMat4(MY_MATRIX_PROJ, lightProjection);
         glCullFace(GL_FRONT);
         renderScene(simpleDepthShader, floor, gameObj, box);
         glCullFace(GL_BACK);
@@ -267,34 +270,32 @@ int main()
         projection = glm::perspective(glm::radians(camera.getZoom()), openglWindow.width / openglWindow.height, 0.1f, 100.0f);
        
         lightShader.use();
-        lightShader.setMat4("view", view);
-        lightShader.setMat4("projection", projection);
+        lightShader.setMat4(MY_MATRIX_VIEW, view);
+        lightShader.setMat4(MY_MATRIX_PROJ, projection);
         /* 
             Draw light
         */
         model = glm::mat4(1.0f);
         model = glm::translate(model, light.position);
         model = glm::scale(model, glm::vec3(0.1f));
-        lightShader.setMat4("model", model);
-        lightShader.setVec3("lightColor", light.color);
+        lightShader.setMat4(MY_MATRIX_MODEL, model);
         light.p_obj->draw(lightShader);
 
 
         shader.use();
-        shader.setMat4("view", view);
-        shader.setMat4("projection", projection);
-        shader.setVec3("cameraPos", camera.cameraPos);
-        shader.setBool("compare", compare);
-        shader.setBool("usePCF", usePCF);
-        shader.setBool("usePCSS", usePCSS);
-        shader.setBool("useShadowmap", useShadowmap);
+        shader.setMat4(MY_MATRIX_VIEW, view);
+        shader.setMat4(MY_MATRIX_PROJ, projection);
+        shader.setVec3(MY_CAMERA_POS, camera.cameraPos);
+        shader.setBool(MY_MODE_PCF, usePCF);
+        shader.setBool(MY_MODE_PCSS, usePCSS);
+        shader.setBool(MY_MODE_SM, useShadowmap);
         if (filtermodeDirty) {
-            shader.setInt("filtermode", filtermode);
+            shader.setInt(MY_MODE_FILTER, filtermode);
             filtermodeDirty = false;
         }
         /* Set pointLight real-time info
         */
-        shader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        shader.setMat4(MY_MATRIX_LIGHTSPACE, lightSpaceMatrix);
         renderScene(shader, floor, gameObj, box);
         
         glfwSwapBuffers(window);

@@ -24,6 +24,7 @@
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
+    <ClInclude Include="MyMacros.h" />
     <ClInclude Include="OpenGLWindow.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Shader.h" />
@@ -39,14 +40,14 @@
     <None Include="debugShader.vert" />
     <None Include="lightShader.frag" />
     <None Include="lightShader.vert" />
-    <None Include="simpleDepthShader.vert" />
+    <None Include="genDepthmap.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad.c" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="simpleDepthShader.frag" />
+    <Text Include="genDepthmap.frag" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
