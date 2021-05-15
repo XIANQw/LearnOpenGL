@@ -3,9 +3,8 @@
 #define MY_TITLE "OpenGLRender"
 
 // some mode variable
-#define MY_MODE_PCF "usePCF"
-#define MY_MODE_PCSS "usePCSS"
-#define MY_MODE_SM "useShadowmap"
+
+#define MY_MODE_SHADOW "shadowmode"
 #define MY_MODE_FILTER "filtermode"
 
 // shader filename

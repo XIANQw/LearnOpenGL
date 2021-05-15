@@ -66,9 +66,7 @@ uniform SpotLight spotLight;
 
 uniform vec3 cameraPos;
 
-uniform bool usePCSS;
-uniform bool usePCF;
-uniform bool useShadowmap;
+uniform int shadowmode;
 uniform int filtermode;
 
 
@@ -290,10 +288,10 @@ void main()
     float texSize = 4.0 / textureSize(depthMap, 0).x;
     float bias = max(0.01 * (1.0 - dot(normal, lightDir)), 0.004);
     float visibility = 1.0;
-    if (usePCF) {
-        visibility = PCF(depthMap, projCoords, texSize, bias);
-    } else if (usePCSS){
+    if (shadowmode == 0){
         visibility = PCSS(depthMap, projCoords, bias);
+    } else if (shadowmode == 1) {
+        visibility = PCF(depthMap, projCoords, texSize, bias);
     } else {
         visibility = useShadowMap(depthMap, projCoords, bias);
     }

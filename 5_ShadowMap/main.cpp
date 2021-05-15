@@ -18,11 +18,14 @@
 const float WIDTH = 800, HEIGHT = 600;
 
 Camera camera;
-bool compare = false;
 bool controlBox = true;
-bool usePCF = true, usePCSS = false, useShadowmap = false;
-int filtermode = 0;
+int shadowmode = 0, shadowButtonPressFrames = 0;
+const int totalShadowModes = 3;
+bool shadowModeChanges = false;
+int filtermode = 0, filterButtonPressFrames = 0;
+const int totalFilterModes = 3;
 bool filtermodeDirty = false;
+const int minimumPressFrames = 5;
 glm::vec3 currentBoxPos = camera.cameraPos;
 void processInput(GLFWwindow* window)
 {
@@ -41,12 +44,7 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
         camera.move(RIGHT);
     }
-    if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
-        compare = true;
-    }
-    if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) {
-        compare = false;
-    }
+
     if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS) {
         controlBox = false;
         currentBoxPos = camera.cameraPos + camera.cameraFront * 2.0f;
@@ -56,32 +54,21 @@ void processInput(GLFWwindow* window)
         controlBox = true;
     }
     if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
-        usePCF = false;
-        usePCSS = true;
-        useShadowmap = false;
-    }
-    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
-        usePCF = true;
-        usePCSS = false;
-        useShadowmap = false;
-    }
-    if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) {
-        usePCF = false;
-        usePCSS = false;
-        useShadowmap = true;
+        shadowButtonPressFrames++;
+        if (shadowButtonPressFrames > minimumPressFrames) {
+            shadowmode = (shadowmode + 1) % totalShadowModes;
+            shadowModeChanges = true;
+            shadowButtonPressFrames = 0;
+        }
     }
 
-	if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) {
-        filtermode = 0;
-        filtermodeDirty = true;
-	}
-	if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS) {
-        filtermode = 1;
-        filtermodeDirty = true;
-	}
-	if (glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS) {
-        filtermode = 2;
-        filtermodeDirty = true;
+	if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
+        filterButtonPressFrames++;
+        if (filterButtonPressFrames > minimumPressFrames) {
+            filtermode = (filtermode + 1) % totalFilterModes;
+            filtermodeDirty = true;
+            filterButtonPressFrames = 0;
+        }
 	}
 }
 
@@ -198,6 +185,12 @@ int main()
     myLight::PointLight light;
     light.position = glm::vec3(-4, 3, 4);
     light.p_obj = std::make_shared<Mesh<Vertex>>(Shape::makeCube());
+	glm::mat4 lightView = glm::lookAt(light.position, glm::vec3(0.0f, 0.0f, 0.0f),
+		glm::vec3(0.0f, 1.0f, 0.0f));
+	GLfloat near_plane = 1.0f, far_plane = 15.0f;
+	glm::mat4 lightProjection = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
+	glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+    
     Shader shader(MY_SHADER_MAIN_VERT, MY_SHADER_MAIN_FRAG);
     shader.use();
     shader.setVec3(MY_POINTLIGHT_AMBIENT, light.ambient);
@@ -206,9 +199,13 @@ int main()
     shader.setVec3(MY_POINTLIGHT_POS, light.position);
     shader.setVec3(MY_POINTLIGHT_COLOR, light.color);
     shader.setFloat(MY_MATERIAL_SHININESS, floor.material.shininess);
+    shader.setMat4(MY_MATRIX_LIGHTSPACE, lightSpaceMatrix);
 
     Shader lightShader(MY_SHADER_LIGHT_VERT, MY_SHADER_LIGHT_FRAG);
     Shader simpleDepthShader(MY_SHADER_DEPTHMAP_VERT, MY_SHADER_DEPTHMAP_FRAG);
+    simpleDepthShader.use();
+	simpleDepthShader.setMat4(MY_MATRIX_VIEW, lightView);
+	simpleDepthShader.setMat4(MY_MATRIX_PROJ, lightProjection);
     //Shader debugShader("debugShader.vert", "debugShader.frag");
 
     const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
@@ -243,14 +240,8 @@ int main()
         glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
         glClear(GL_DEPTH_BUFFER_BIT);
         // Configuration shader
-        glm::mat4 lightView = glm::lookAt(light.position, glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f));
-        GLfloat near_plane = 1.0f, far_plane = 15.0f;
-        glm::mat4 lightProjection = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
-        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
         simpleDepthShader.use();
-        simpleDepthShader.setMat4(MY_MATRIX_VIEW, lightView);
-        simpleDepthShader.setMat4(MY_MATRIX_PROJ, lightProjection);
         glCullFace(GL_FRONT);
         renderScene(simpleDepthShader, floor, gameObj, box);
         glCullFace(GL_BACK);
@@ -286,18 +277,19 @@ int main()
         shader.setMat4(MY_MATRIX_VIEW, view);
         shader.setMat4(MY_MATRIX_PROJ, projection);
         shader.setVec3(MY_CAMERA_POS, camera.cameraPos);
-        shader.setBool(MY_MODE_PCF, usePCF);
-        shader.setBool(MY_MODE_PCSS, usePCSS);
-        shader.setBool(MY_MODE_SM, useShadowmap);
+        if (shadowModeChanges) {
+            shader.setInt(MY_MODE_SHADOW, shadowmode);
+            shadowModeChanges = false;
+        }
         if (filtermodeDirty) {
             shader.setInt(MY_MODE_FILTER, filtermode);
             filtermodeDirty = false;
         }
         /* Set pointLight real-time info
         */
-        shader.setMat4(MY_MATRIX_LIGHTSPACE, lightSpaceMatrix);
+
         renderScene(shader, floor, gameObj, box);
-        
+      
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
