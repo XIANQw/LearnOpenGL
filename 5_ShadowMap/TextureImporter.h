@@ -14,11 +14,85 @@ enum texture_type {
 };
 
 struct Texture {
-	uint32_t id;
-	texture_type type;
-	std::string path;
-	int width;
-	int height;
+	uint32_t m_id;
+	texture_type m_type;
+	std::string m_path;
+	int m_width;
+	int m_height;
+	uint32_t m_fbo = 0;
+	uint32_t m_renderBuffer = 0;
+	GLenum m_textureTarget;
+	
+	Texture() = default;
+	Texture(int width, int height, 
+		GLenum textureTarget, 
+		GLfloat filter, GLenum format, 
+		GLenum internalFormat, 
+		bool clamp, GLenum attachment, 
+		texture_type texturetype,
+		GLfloat* boarderColor = nullptr) :
+		m_width(width), m_height(height), m_type(texturetype), m_textureTarget(textureTarget)
+	{
+		InitTexture(textureTarget, filter, format, internalFormat, clamp, boarderColor);
+		InitRenderTargets(attachment);
+	}
+	void InitTexture(GLenum textureTarget, GLfloat filter, GLenum format, GLenum internalFormat, bool clamp, GLfloat* boarderColor) {
+		glGenTextures(1, &m_id);
+		glBindTexture(textureTarget, m_id);
+		
+		glTexImage2D(textureTarget, 0, internalFormat, m_width, m_height, 0, format, GL_FLOAT, NULL);
+
+		glTexParameterf(textureTarget, GL_TEXTURE_MIN_FILTER, filter);
+		glTexParameterf(textureTarget, GL_TEXTURE_MAG_FILTER, filter);
+		if (clamp) {
+			glTexParameterf(textureTarget, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			glTexParameterf(textureTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		}
+		glTexParameteri(textureTarget, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(textureTarget, GL_TEXTURE_MAX_LEVEL, 0);
+		if (boarderColor != nullptr) {
+			glTexParameterfv(textureTarget, GL_TEXTURE_BORDER_COLOR, boarderColor);
+		}
+	}
+
+	void InitRenderTargets(GLenum attachment) {
+		bool hasDepth = false;
+		GLenum drawBuffer = GL_NONE;
+		if (attachment == GL_DEPTH_ATTACHMENT) {
+			hasDepth = true;
+		}
+		else {
+			drawBuffer = attachment;
+		}
+		if (m_fbo == 0) {
+			glGenFramebuffers(1, &m_fbo);
+			glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+		}
+		glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, m_textureTarget, m_id, 0);
+
+		if (m_fbo == 0) {
+			return;
+		}
+		if (!hasDepth) {
+			glGenRenderbuffers(1, &m_renderBuffer);
+			glBindRenderbuffer(GL_RENDERBUFFER, m_renderBuffer);
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, m_width, m_height);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_renderBuffer);
+		}
+		glDrawBuffer(drawBuffer);
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			std::cerr << "FBO is incomplete" << std::endl;
+			assert(false);
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
+	void bindToRenderTarget() {
+		glBindTexture(m_textureTarget, m_id);
+		glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+		glViewport(0, 0, m_width, m_height);
+	}
+	
 };
 
 namespace TextureImporter {
@@ -29,17 +103,17 @@ namespace TextureImporter {
 		const int filteringMode = GL_LINEAR) {
 
 		Texture texture;
-		texture.type = type;
-		texture.path = filename;
+		texture.m_type = type;
+		texture.m_path = filename;
 		stbi_set_flip_vertically_on_load(true);
 		unsigned char* data = nullptr;
 		
-		texture.type = type;
-		// Generate a texture and set id to 'texture's adresse
-		glGenTextures(1, &texture.id);
+		texture.m_type = type;
+		// Generate a texture and set id to 'texture's address
+		glGenTextures(1, &texture.m_id);
 		// Binding texture 2D
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texture.id);
+		glBindTexture(GL_TEXTURE_2D, texture.m_id);
 		// Set wrap and filter attributs
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapMode); // S and T direction's wrap mode: repeat
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapMode);
@@ -49,7 +123,7 @@ namespace TextureImporter {
 
 		// Load data from image
 		int nrComponent;
-		data = stbi_load(filename, &texture.width, &texture.height, &nrComponent, 0);
+		data = stbi_load(filename, &texture.m_width, &texture.m_height, &nrComponent, 0);
 		if (data) {
 			GLenum format = GL_RGB;
 			if (nrComponent == 1)
@@ -59,7 +133,7 @@ namespace TextureImporter {
 			else if (nrComponent == 4)
 				format = GL_RGBA;
 			// Copy image data to texture2D
-			glTexImage2D(GL_TEXTURE_2D, 0, format, texture.width, texture.height, 0, format, GL_UNSIGNED_BYTE, data);
+			glTexImage2D(GL_TEXTURE_2D, 0, format, texture.m_width, texture.m_height, 0, format, GL_UNSIGNED_BYTE, data);
 			// Generate Mipmap
 			glGenerateMipmap(GL_TEXTURE_2D);
 		}
@@ -70,38 +144,6 @@ namespace TextureImporter {
 		stbi_image_free(data);
 
 		return texture;
-	}
-
-	Texture newDepthMap(int width, int height) {
-		// Create a depth texutre
-		Texture depthmap;
-		depthmap.width = width;
-		depthmap.height = height;
-		depthmap.type = t_depthmap;
-		glGenTextures(1, &depthmap.id);
-		glBindTexture(GL_TEXTURE_2D, depthmap.id);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
-			width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-		GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-		return depthmap;
-	}
-
-	uint32_t bindDepthMapToFBO(uint32_t depthMapID) {
-		// Create a FBO for our depthmap
-		GLuint depthMapFBO;
-		glGenFramebuffers(1, &depthMapFBO);
-		// Bind FB to pipeline and bind depth map to FB
-		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMapID, 0);
-		glDrawBuffer(GL_NONE);
-		glReadBuffer(GL_NONE);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		return depthMapFBO;
 	}
 
 };

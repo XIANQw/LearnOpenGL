@@ -209,9 +209,12 @@ int main()
     //Shader debugShader("debugShader.vert", "debugShader.frag");
 
     const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
-    std::shared_ptr<Texture> depthMap_ptr = std::make_shared<Texture>(
-        TextureImporter::newDepthMap(SHADOW_WIDTH, SHADOW_HEIGHT));
-    const GLuint depthMapFBO = TextureImporter::bindDepthMapToFBO(depthMap_ptr->id);
+    GLfloat borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	std::shared_ptr<Texture> depthMap_ptr = std::make_shared<Texture>(
+        Texture(SHADOW_WIDTH, SHADOW_HEIGHT, GL_TEXTURE_2D, GL_NEAREST, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, true, GL_DEPTH_ATTACHMENT, t_depthmap, borderColor));
+   // std::shared_ptr<Texture> depthMap_ptr = std::make_shared<Texture>(
+			//TextureImporter::newDepthMap(SHADOW_WIDTH, SHADOW_HEIGHT));
+   // const GLuint depthMapFBO = TextureImporter::bindDepthMapToFBO(depthMap_ptr->m_id);
     floor.depthMap = depthMap_ptr;
     for (auto& mesh : gameObj.meshes) {
         mesh.depthMap = depthMap_ptr;
@@ -236,8 +239,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // Render depth map
-        glViewport(0, 0, depthMap_ptr->width, depthMap_ptr->height);
-        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        depthMap_ptr->bindToRenderTarget();
         glClear(GL_DEPTH_BUFFER_BIT);
         // Configuration shader
 

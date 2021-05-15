@@ -63,20 +63,20 @@ public:
 		for (size_t i = 0; i < textures.size(); i++) {
 			std::string number;
 			glActiveTexture(GL_TEXTURE0 + i);
-			if (textures[i].type == texture_type::t_diffusemap) {
+			if (textures[i].m_type == texture_type::t_diffusemap) {
 				number = std::to_string(diffuseMapN++);
 				shader.setInt("material.diffuseMap" + number, i);
 			}
-			else if (textures[i].type == texture_type::t_specularmap) {
+			else if (textures[i].m_type == texture_type::t_specularmap) {
 				number = std::to_string(specularMapN++);
 				shader.setInt("material.specularMap" + number, i);
 			}
-			glBindTexture(GL_TEXTURE_2D, textures[i].id);
+			glBindTexture(GL_TEXTURE_2D, textures[i].m_id);
 		}
 		if (depthMap != nullptr) {
 			glActiveTexture(GL_TEXTURE0 + textures.size());
 			shader.setInt("depthMap", textures.size());
-			glBindTexture(GL_TEXTURE_2D, depthMap->id);
+			glBindTexture(GL_TEXTURE_2D, depthMap->m_id);
 		}
 		
 		glBindVertexArray(VAO);

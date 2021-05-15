@@ -98,7 +98,7 @@ private:
             // Check whether texture was loaded
             bool skip = false;
             for (auto& tex:textures_loaded) {
-                if (std::strcmp(str.C_Str(), tex.path.c_str()) == 0) {
+                if (std::strcmp(str.C_Str(), tex.m_path.c_str()) == 0) {
                     outTextureLoaded.push_back(tex);
                     skip = true;
                     break;
