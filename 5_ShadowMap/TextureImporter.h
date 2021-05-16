@@ -20,27 +20,32 @@ struct Texture {
 	int m_width;
 	int m_height;
 	uint32_t m_fbo = 0;
-	uint32_t m_renderBuffer = 0;
+	uint32_t m_rbo = 0;
 	GLenum m_textureTarget;
 	
 	Texture() = default;
 	Texture(int width, int height, 
 		GLenum textureTarget, 
-		GLfloat filter, GLenum format, 
+		GLfloat filter, 
+		GLenum format, 
 		GLenum internalFormat, 
-		bool clamp, GLenum attachment, 
+		bool clamp, 
+		GLenum attachment, 
 		texture_type texturetype,
-		GLfloat* boarderColor = nullptr) :
-		m_width(width), m_height(height), m_type(texturetype), m_textureTarget(textureTarget)
+		GLfloat* boarderColor = nullptr,
+		unsigned char* data = nullptr) :
+		m_width(width), m_height(height), m_textureTarget(textureTarget), m_type(texturetype)
 	{
-		InitTexture(textureTarget, filter, format, internalFormat, clamp, boarderColor);
+		InitTexture(textureTarget, filter, format, internalFormat, clamp, boarderColor, data);
 		InitRenderTargets(attachment);
 	}
-	void InitTexture(GLenum textureTarget, GLfloat filter, GLenum format, GLenum internalFormat, bool clamp, GLfloat* boarderColor) {
+
+
+	void InitTexture(GLenum textureTarget, GLfloat filter, GLenum format, GLenum internalFormat, bool clamp, GLfloat* boarderColor, unsigned char* data) {
 		glGenTextures(1, &m_id);
 		glBindTexture(textureTarget, m_id);
 		
-		glTexImage2D(textureTarget, 0, internalFormat, m_width, m_height, 0, format, GL_FLOAT, NULL);
+		glTexImage2D(textureTarget, 0, internalFormat, m_width, m_height, 0, format, GL_UNSIGNED_BYTE, data);
 
 		glTexParameterf(textureTarget, GL_TEXTURE_MIN_FILTER, filter);
 		glTexParameterf(textureTarget, GL_TEXTURE_MAG_FILTER, filter);
@@ -73,13 +78,14 @@ struct Texture {
 		if (m_fbo == 0) {
 			return;
 		}
-		if (!hasDepth) {
-			glGenRenderbuffers(1, &m_renderBuffer);
-			glBindRenderbuffer(GL_RENDERBUFFER, m_renderBuffer);
-			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, m_width, m_height);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_renderBuffer);
+		if (!hasDepth)
+		{
+			glGenRenderbuffers(1, &m_rbo);
+			glBindRenderbuffer(GL_RENDERBUFFER, m_rbo);
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, m_width, m_height);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, m_rbo);
 		}
-		glDrawBuffer(drawBuffer);
+
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
 			std::cerr << "FBO is incomplete" << std::endl;
 			assert(false);

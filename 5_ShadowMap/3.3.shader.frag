@@ -152,6 +152,7 @@ float findBlocker( sampler2D shadowMap, vec2 uv, float zReceiver ) {
     int count = 0;
     for(int i=0; i<PCF_NUM_SAMPLES; i++){
         float zOcc = texture2D(shadowMap, uv + poissonDisk[i] * searchSize).r;
+        if(zOcc == 0.0) zOcc = 1.0;
         if (zReceiver - bias > zOcc){
             meanDepth += zOcc;
             count += 1;
@@ -173,6 +174,7 @@ float PCF(sampler2D shadowMap, vec3 coords, float filterSize, float bias) {
     poissonDiskSamples(coords.xy);
     for(int i=0; i<PCF_NUM_SAMPLES; i++){
     float zOcc = texture2D(shadowMap, coords.xy + filterSize * poissonDisk[i]).r;
+    if(zOcc == 0.0) zOcc = 1.0;
     visibility += coords.z - bias > zOcc ? 0.0 : 1.0;
     }
     visibility /= float(PCF_NUM_SAMPLES);
@@ -182,6 +184,7 @@ float PCF(sampler2D shadowMap, vec3 coords, float filterSize, float bias) {
     uniformDiskSamples(coords.xy);
     for(int i=0; i<PCF_NUM_SAMPLES; i++){
         float zOcc = texture2D(shadowMap, coords.xy + poissonDisk[i] * filterSize).r;
+        if(zOcc == 0.0) zOcc = 1.0;
         visibility += coords.z - bias > zOcc ? 0.0 : 1.0;
     }
 
@@ -191,6 +194,7 @@ float PCF(sampler2D shadowMap, vec3 coords, float filterSize, float bias) {
     for(int x=-1; x<=1; x++){
         for(int y=-1; y<=1; y++){
         float zOcc = texture2D(shadowMap, coords.xy + vec2(x + 0.5, y + 0.5) * filterSize).r;
+        if(zOcc == 0.0) zOcc = 1.0;
         visibility += coords.z - bias > zOcc ? 0.0 : 1.0;
         }
     }
@@ -222,8 +226,23 @@ float PCSS(sampler2D shadowMap, vec3 coords, float bias){
 
 float useShadowMap(sampler2D shadowMap, vec3 shadowCoord, float bias){
   float zOcc = texture2D(shadowMap, shadowCoord.xy).r;
+  if(zOcc == 0.0) zOcc = 1.0;
   float visibility = shadowCoord.z - bias > zOcc ? 0.0: 1.0;
   return visibility;
+}
+
+
+float VSM(sampler2D shadowMap, vec3 coords, float bias){
+    
+    float compare = coords.z - bias;
+    vec2 moments = texture2D(shadowMap, coords.xy).xy;
+    float p = step(compare, moments.x);
+    float variance = max(moments.y - moments.x * moments.x, 0.00002);
+    
+    float d = compare - moments.x;
+    float pMax = variance / (variance + d*d);
+
+    return min(max(pMax, p), 1.0);
 }
 
 
@@ -244,11 +263,9 @@ float getCurrentDepth(vec4 fragPosLightSpace)
     return currentDepth;
 }
 
-float getClosestDepth(vec4 fragPosLightSpace)
+float getClosestDepth(vec4 Coords)
 {
-    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-    projCoords = projCoords * 0.5 + 0.5;
-    float closestDepth = texture(depthMap, projCoords.xy).r;
+    float closestDepth = texture(depthMap, Coords.xy).r;
     return closestDepth;
 }
 
@@ -289,14 +306,20 @@ void main()
     float bias = max(0.01 * (1.0 - dot(normal, lightDir)), 0.004);
     float visibility = 1.0;
     if (shadowmode == 0){
-        visibility = PCSS(depthMap, projCoords, bias);
+        visibility = VSM(depthMap, projCoords, bias);
     } else if (shadowmode == 1) {
         visibility = PCF(depthMap, projCoords, texSize, bias);
-    } else {
+    } else if (shadowmode == 2){
         visibility = useShadowMap(depthMap, projCoords, bias);
+    } else if (shadowmode == 3){
+        visibility = PCSS(depthMap, projCoords, bias);
     }
     vec3 color = blinPhong(projCoords, samplingDiffRes, samplingSpecRes, visibility);
-
-    FragColor = vec4(color, 1.0);    
+    if(shadowmode == 4){
+        float zOcc = texture2D(depthMap, projCoords.xy).r;
+        FragColor = vec4(vec3(zOcc), 1.0);
+    }else{
+        FragColor = vec4(color, 1.0);    
+    }
 }
 

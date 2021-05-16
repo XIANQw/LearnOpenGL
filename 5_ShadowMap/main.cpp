@@ -20,7 +20,7 @@ const float WIDTH = 800, HEIGHT = 600;
 Camera camera;
 bool controlBox = true;
 int shadowmode = 0, shadowButtonPressFrames = 0;
-const int totalShadowModes = 3;
+const int totalShadowModes = 5;
 bool shadowModeChanges = false;
 int filtermode = 0, filterButtonPressFrames = 0;
 const int totalFilterModes = 3;
@@ -178,19 +178,19 @@ int main()
 
     Model gameObj("../img/nanosuit/nanosuit.obj");
 
-    /* 
+    /*
         为了做shadow mapping, 需要将camera放在光源位置
         所以这里用 SpotLight 充当 Directional Light
     */
     myLight::PointLight light;
     light.position = glm::vec3(-4, 3, 4);
     light.p_obj = std::make_shared<Mesh<Vertex>>(Shape::makeCube());
-	glm::mat4 lightView = glm::lookAt(light.position, glm::vec3(0.0f, 0.0f, 0.0f),
-		glm::vec3(0.0f, 1.0f, 0.0f));
-	GLfloat near_plane = 1.0f, far_plane = 15.0f;
-	glm::mat4 lightProjection = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
-	glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-    
+    glm::mat4 lightView = glm::lookAt(light.position, glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 1.0f, 0.0f));
+    GLfloat near_plane = 1.0f, far_plane = 15.0f;
+    glm::mat4 lightProjection = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
+    glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
     Shader shader(MY_SHADER_MAIN_VERT, MY_SHADER_MAIN_FRAG);
     shader.use();
     shader.setVec3(MY_POINTLIGHT_AMBIENT, light.ambient);
@@ -202,19 +202,21 @@ int main()
     shader.setMat4(MY_MATRIX_LIGHTSPACE, lightSpaceMatrix);
 
     Shader lightShader(MY_SHADER_LIGHT_VERT, MY_SHADER_LIGHT_FRAG);
+    lightShader.use();
+    lightShader.setVec3("lightColor", light.color);
     Shader simpleDepthShader(MY_SHADER_DEPTHMAP_VERT, MY_SHADER_DEPTHMAP_FRAG);
     simpleDepthShader.use();
-	simpleDepthShader.setMat4(MY_MATRIX_VIEW, lightView);
-	simpleDepthShader.setMat4(MY_MATRIX_PROJ, lightProjection);
+    simpleDepthShader.setMat4(MY_MATRIX_VIEW, lightView);
+    simpleDepthShader.setMat4(MY_MATRIX_PROJ, lightProjection);
     //Shader debugShader("debugShader.vert", "debugShader.frag");
 
     const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
     GLfloat borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	std::shared_ptr<Texture> depthMap_ptr = std::make_shared<Texture>(
-        Texture(SHADOW_WIDTH, SHADOW_HEIGHT, GL_TEXTURE_2D, GL_NEAREST, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, true, GL_DEPTH_ATTACHMENT, t_depthmap, borderColor));
-   // std::shared_ptr<Texture> depthMap_ptr = std::make_shared<Texture>(
-			//TextureImporter::newDepthMap(SHADOW_WIDTH, SHADOW_HEIGHT));
-   // const GLuint depthMapFBO = TextureImporter::bindDepthMapToFBO(depthMap_ptr->m_id);
+    GLubyte* texData = new GLubyte[SHADOW_WIDTH * SHADOW_HEIGHT * 4];
+    memset(texData, 255, SHADOW_WIDTH * SHADOW_HEIGHT * 4);
+
+    std::shared_ptr<Texture> depthMap_ptr = std::make_shared<Texture>(
+        Texture(SHADOW_WIDTH, SHADOW_HEIGHT, GL_TEXTURE_2D, GL_NEAREST, GL_RGBA , GL_RG32F, true, GL_COLOR_ATTACHMENT0, t_depthmap, borderColor, texData));
     floor.depthMap = depthMap_ptr;
     for (auto& mesh : gameObj.meshes) {
         mesh.depthMap = depthMap_ptr;
