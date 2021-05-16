@@ -18,15 +18,18 @@
 const float WIDTH = 800, HEIGHT = 600;
 
 Camera camera;
-bool controlBox = true;
+bool controlBox = false;
 int shadowmode = 0, shadowButtonPressFrames = 0;
-const int totalShadowModes = 5;
+const int totalShadowModes = 5, totalFilterModes = 3;
 bool shadowModeChanges = false;
 int filtermode = 0, filterButtonPressFrames = 0;
-const int totalFilterModes = 3;
+
 bool filtermodeDirty = false;
 const int minimumPressFrames = 5;
-glm::vec3 currentBoxPos = camera.cameraPos;
+glm::vec3 currentBoxPos = glm::vec3(-1.0f, 0.0f, -1.0f);
+bool lightMoving = false;
+int lightButtonPressFrames = 0;
+
 void processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -70,6 +73,14 @@ void processInput(GLFWwindow* window)
             filterButtonPressFrames = 0;
         }
 	}
+    
+	if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) {
+		lightButtonPressFrames++;
+		if (lightButtonPressFrames > minimumPressFrames) {
+            lightMoving = !lightMoving;
+			lightButtonPressFrames = 0;
+		}
+	}
 }
 
 bool firstMouse = true;
@@ -105,6 +116,7 @@ inline void renderScene(const Shader& shader, Mesh<VertexNormalTex>& floor, Mode
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0));
+    model = glm::scale(model, glm::vec3(0.8, 1.0, 0.8));
     shader.setMat4(MY_MATRIX_MODEL, model);
     shader.setBool(MY_MATERIAL_USE_SPECULARMAP, false);
     floor.draw(shader);
@@ -185,11 +197,7 @@ int main()
     myLight::PointLight light;
     light.position = glm::vec3(-4, 3, 4);
     light.p_obj = std::make_shared<Mesh<Vertex>>(Shape::makeCube());
-    glm::mat4 lightView = glm::lookAt(light.position, glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f));
-    GLfloat near_plane = 1.0f, far_plane = 15.0f;
-    glm::mat4 lightProjection = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
-    glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
 
     Shader shader(MY_SHADER_MAIN_VERT, MY_SHADER_MAIN_FRAG);
     shader.use();
@@ -199,15 +207,12 @@ int main()
     shader.setVec3(MY_POINTLIGHT_POS, light.position);
     shader.setVec3(MY_POINTLIGHT_COLOR, light.color);
     shader.setFloat(MY_MATERIAL_SHININESS, floor.material.shininess);
-    shader.setMat4(MY_MATRIX_LIGHTSPACE, lightSpaceMatrix);
 
     Shader lightShader(MY_SHADER_LIGHT_VERT, MY_SHADER_LIGHT_FRAG);
     lightShader.use();
     lightShader.setVec3("lightColor", light.color);
     Shader simpleDepthShader(MY_SHADER_DEPTHMAP_VERT, MY_SHADER_DEPTHMAP_FRAG);
-    simpleDepthShader.use();
-    simpleDepthShader.setMat4(MY_MATRIX_VIEW, lightView);
-    simpleDepthShader.setMat4(MY_MATRIX_PROJ, lightProjection);
+
     //Shader debugShader("debugShader.vert", "debugShader.frag");
 
     const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
@@ -216,7 +221,7 @@ int main()
     memset(texData, 255, SHADOW_WIDTH * SHADOW_HEIGHT * 4);
 
     std::shared_ptr<Texture> depthMap_ptr = std::make_shared<Texture>(
-        Texture(SHADOW_WIDTH, SHADOW_HEIGHT, GL_TEXTURE_2D, GL_NEAREST, GL_RGBA , GL_RG32F, true, GL_COLOR_ATTACHMENT0, t_depthmap, borderColor, texData));
+        Texture(SHADOW_WIDTH, SHADOW_HEIGHT, GL_TEXTURE_2D, GL_LINEAR, GL_RGBA , GL_RG32F, true, GL_COLOR_ATTACHMENT0, t_depthmap, borderColor, texData));
     floor.depthMap = depthMap_ptr;
     for (auto& mesh : gameObj.meshes) {
         mesh.depthMap = depthMap_ptr;
@@ -227,6 +232,7 @@ int main()
     float deltaTime = 0.0f; // 当前帧与上一帧的时间差
     float lastFrame = 0.0f; // 上一帧的时间
 
+    float lightHeight = light.position.y, lastHeght = light.position.y;
     // Render loop
     while (!glfwWindowShouldClose(window))
     {
@@ -241,11 +247,28 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // Render depth map
+        lastHeght = lightHeight;
+        if (lightMoving) {
+            lightHeight = sin(currentFrame) + 2.0;
+            light.position.y = lightHeight;
+        }
+        else {
+            light.position.y = lastHeght;
+        }
+		light.p_obj = std::make_shared<Mesh<Vertex>>(Shape::makeCube());
+		glm::mat4 lightView = glm::lookAt(light.position, glm::vec3(0.0f, 0.0f, 0.0f),
+			glm::vec3(0.0f, 1.0f, 0.0f));
+		GLfloat near_plane = 1.0f, far_plane = 15.0f;
+		glm::mat4 lightProjection = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, near_plane, far_plane);
+		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
         depthMap_ptr->bindToRenderTarget();
         glClear(GL_DEPTH_BUFFER_BIT);
         // Configuration shader
 
         simpleDepthShader.use();
+		simpleDepthShader.setMat4(MY_MATRIX_VIEW, lightView);
+		simpleDepthShader.setMat4(MY_MATRIX_PROJ, lightProjection);
         glCullFace(GL_FRONT);
         renderScene(simpleDepthShader, floor, gameObj, box);
         glCullFace(GL_BACK);
@@ -281,6 +304,8 @@ int main()
         shader.setMat4(MY_MATRIX_VIEW, view);
         shader.setMat4(MY_MATRIX_PROJ, projection);
         shader.setVec3(MY_CAMERA_POS, camera.cameraPos);
+        shader.setVec3(MY_POINTLIGHT_POS, light.position);
+		shader.setMat4(MY_MATRIX_LIGHTSPACE, lightSpaceMatrix);
         if (shadowModeChanges) {
             shader.setInt(MY_MODE_SHADOW, shadowmode);
             shadowModeChanges = false;
