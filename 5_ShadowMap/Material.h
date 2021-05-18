@@ -15,6 +15,8 @@ namespace myMaterial {
 		glm::vec3 Ks;
 		float shininess;
 		glm::vec4 objColorRGBA;
+		std::vector<Texture> textures;
+
 
 		Material() {
 			Ka = DEFAULT_KA;

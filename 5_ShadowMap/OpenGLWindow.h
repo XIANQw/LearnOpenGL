@@ -15,7 +15,7 @@ private:
 public:
 	float width, height;
 
-	OpenGLWindow(uint32_t width, uint32_t height, const char* title):width(width), height(height) {
+	OpenGLWindow(uint32_t width, uint32_t height, const char* title) :width(width), height(height) {
 		glfwInit();
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -40,6 +40,12 @@ public:
 
 	GLFWwindow* getWindow() {
 		return window;
+	}
+
+	void bindToRenderTarget() {
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, width, height);
 	}
 
 };

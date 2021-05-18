@@ -26,6 +26,9 @@
 
 #define MY_MATERIAL_SHININESS "material.shininess"
 #define MY_MATERIAL_USE_SPECULARMAP "material.useSpecularMap"
+#define MY_MATERIAL_TEX_DIFFUSE "material.diffuseMap"
+#define MY_MATERIAL_TEX_SPECULAR "material.specularMap"
+
 
 #define MY_CAMERA_POS "cameraPos"
 

@@ -180,13 +180,13 @@ int main()
 
     auto floor = Shape::makePlane();
     Texture floorTexture = TextureImporter::importTexture("../img/floor.png", t_diffusemap);
-    floor.textures.push_back(floorTexture);
+    floor.material.textures.push_back(floorTexture);
 
     auto box = Shape::makeCubeWithPosNormalTexcoords();
     Texture boxDiffTex = TextureImporter::importTexture("../img/container2.png", t_diffusemap);
     Texture boxSpecTex = TextureImporter::importTexture("../img/container2_specular.png", t_specularmap);
-    box.textures.push_back(boxDiffTex);
-    box.textures.push_back(boxSpecTex);
+    box.material.textures.push_back(boxDiffTex);
+    box.material.textures.push_back(boxSpecTex);
 
     Model gameObj("../img/nanosuit/nanosuit.obj");
 
@@ -206,7 +206,7 @@ int main()
     shader.setVec3(MY_POINTLIGHT_SPECULAR, light.specular);
     shader.setVec3(MY_POINTLIGHT_POS, light.position);
     shader.setVec3(MY_POINTLIGHT_COLOR, light.color);
-    shader.setFloat(MY_MATERIAL_SHININESS, floor.material.shininess);
+
 
     Shader lightShader(MY_SHADER_LIGHT_VERT, MY_SHADER_LIGHT_FRAG);
     lightShader.use();
@@ -272,10 +272,9 @@ int main()
         glCullFace(GL_FRONT);
         renderScene(simpleDepthShader, floor, gameObj, box);
         glCullFace(GL_BACK);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         // reset viewport
-        glViewport(0, 0, openglWindow.width, openglWindow.height);
+        openglWindow.bindToRenderTarget();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         /* 

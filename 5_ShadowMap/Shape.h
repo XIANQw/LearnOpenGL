@@ -56,8 +56,7 @@ namespace Shape {
 			glm::vec2 tex(vertices[i + 6], vertices[i + 7]);
 			vertexArr.push_back(VertexNormalTex(pos, normal, tex));
 		}
-		std::vector<uint32_t> indices{};
-		return Mesh<VertexNormalTex>(vertexArr, indices);
+		return Mesh<VertexNormalTex>(vertexArr);
 	}
 
 	Mesh<Vertex> makeCube() {
@@ -66,8 +65,7 @@ namespace Shape {
 			glm::vec3 pos(vertices[i], vertices[i + 1], vertices[i + 2]);
 			vertexArr.push_back(Vertex(pos));
 		}
-		std::vector<uint32_t> indices{};
-		return Mesh<Vertex>(vertexArr, indices);
+		return Mesh<Vertex>(vertexArr);
 	}
 
 	const std::vector<float> planeVertices = {
@@ -88,7 +86,25 @@ namespace Shape {
 			glm::vec2 tex(planeVertices[i + 3], planeVertices[i + 4]);
 			vertexArr.push_back(VertexNormalTex(pos, glm::vec3(0, 1, 0), tex));
 		}
-		std::vector<uint32_t> indices{};
-		return Mesh<VertexNormalTex>(vertexArr, indices);
+		return Mesh<VertexNormalTex>(vertexArr);
 	}
+
+	const static std::vector<float> quadVertices = {
+		// positions        // texture Coords
+		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+		 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+		 1.0f, -1.0f, 0.0f, 1.0f, 0.0f
+	};
+	Mesh<VertexTex> makeQuad() {
+		std::vector<VertexTex> vertexArr;
+		for (size_t i = 0; i < planeVertices.size(); i += VertexTex::layout.back()) {
+			glm::vec3 pos(planeVertices[i], planeVertices[i + 1], planeVertices[i + 2]);
+			glm::vec2 tex(planeVertices[i + 3], planeVertices[i + 4]);
+			vertexArr.push_back(VertexTex(pos, tex));
+		}
+		return Mesh<VertexTex>(vertexArr);
+	}
+
+
 }

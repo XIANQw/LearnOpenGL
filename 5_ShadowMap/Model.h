@@ -85,7 +85,7 @@ private:
             loadMaterialTextures(material, aiTextureType_SPECULAR, texture_type::t_specularmap, textures);
         }
         auto res = Mesh<VertexNormalTex>(vertices, indices);
-        res.textures = textures;
+        res.material.textures = textures;
         return res;
     }
     

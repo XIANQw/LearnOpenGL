@@ -234,7 +234,7 @@ float VSM(sampler2D shadowMap, vec3 coords, float varianceMin){
 
     vec2 moments = texture2D(shadowMap, coords.xy).xy;
     float p = step(coords.z, moments.x);
-    float variance = max(moments.y - moments.x * moments.x, 0.00002);
+    float variance = max(moments.y - moments.x * moments.x, varianceMin);
     
     float d = coords.z - moments.x;
     float pMax = linstep(0.2, 1.0, variance / (variance + d*d));
@@ -303,7 +303,7 @@ void main()
     float bias = max(0.01 * (1.0 - dot(normal, lightDir)), 0.004);
     float visibility = 1.0;
     if (shadowmode == 0){
-        visibility = VSM(depthMap, projCoords, 0.0);
+        visibility = VSM(depthMap, projCoords, 0.00002);
     } else if (shadowmode == 1) {
         visibility = PCF(depthMap, projCoords, texSize, bias);
     } else if (shadowmode == 2){

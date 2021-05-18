@@ -15,13 +15,13 @@ public:
 	std::vector<VertexType> vertices;
 	std::vector<uint32_t> indices;
 	uint32_t VAO, VBO, EBO;
-	myMaterial::Material material;
-	std::vector<Texture> textures;
+	myMaterial::Material material;		
 	std::shared_ptr<Texture> depthMap = nullptr;
+
 	
 	Mesh() = default;
 	Mesh(const std::vector<VertexType>& vertices,
-		const std::vector<uint32_t>& indices) : 
+		const std::vector<uint32_t>& indices = std::vector<uint32_t>{}) :
 		vertices(vertices),
 		indices(indices){
 		glGenVertexArrays(1, &VAO);
@@ -49,33 +49,34 @@ public:
 	}
 
 	void bindTexturesToGL() {
-		for (size_t i = 0; i < textures.size(); i++) {
+		for (size_t i = 0; i < material.textures.size(); i++) {
 			glActiveTexture(GL_TEXTURE0 + i);
-			glBindTexture(GL_TEXTURE_2D, textures[i].id);
+			glBindTexture(GL_TEXTURE_2D, material.textures[i].id);
 		}
 	}
 
 	void draw(Shader shader) {
 		shader.use();
-		
+		shader.setFloat(MY_MATERIAL_SHININESS, material.shininess);
+
 		uint32_t diffuseMapN = 1;
 		uint32_t specularMapN = 1;
-		for (size_t i = 0; i < textures.size(); i++) {
+		for (size_t i = 0; i < material.textures.size(); i++) {
 			std::string number;
 			glActiveTexture(GL_TEXTURE0 + i);
-			if (textures[i].m_type == texture_type::t_diffusemap) {
+			if (material.textures[i].m_type == texture_type::t_diffusemap) {
 				number = std::to_string(diffuseMapN++);
-				shader.setInt("material.diffuseMap" + number, i);
+				shader.setInt(MY_MATERIAL_TEX_DIFFUSE + number, i);
 			}
-			else if (textures[i].m_type == texture_type::t_specularmap) {
+			else if (material.textures[i].m_type == texture_type::t_specularmap) {
 				number = std::to_string(specularMapN++);
-				shader.setInt("material.specularMap" + number, i);
+				shader.setInt(MY_MATERIAL_TEX_SPECULAR + number, i);
 			}
-			glBindTexture(GL_TEXTURE_2D, textures[i].m_id);
+			glBindTexture(GL_TEXTURE_2D, material.textures[i].m_id);
 		}
 		if (depthMap != nullptr) {
-			glActiveTexture(GL_TEXTURE0 + textures.size());
-			shader.setInt("depthMap", textures.size());
+			glActiveTexture(GL_TEXTURE0 + material.textures.size());
+			shader.setInt("depthMap", material.textures.size());
 			glBindTexture(GL_TEXTURE_2D, depthMap->m_id);
 		}
 		
