@@ -169,6 +169,28 @@ void renderQuad()
 }
 
 
+inline void ApplyFilter(Shader& filter, Mesh<VertexTex>& quad, Texture& src, Texture& dst, glm::vec3& blurScale) {
+	dst.bindToRenderTarget();
+    glClearColor(0.0, 0.0, 0.0, 0.0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	filter.use();
+	filter.setInt("depthMap", 0);
+    filter.setVec3("blurScale", blurScale);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, src.m_id);
+    quad.draw(filter);
+}
+
+void blurDepthmap(Shader& filter, Mesh<VertexTex>& quad, Texture& src, Texture& dst, float blurAmount) {
+
+	glm::vec3 blurScaleX = glm::vec3(1.0f / (src.m_width * blurAmount), 0.0f, 0.0f);
+    ApplyFilter(filter, quad, src, dst, blurScaleX);
+
+    glm::vec3 blurScaleY = glm::vec3(0.0f, 1.0f / (src.m_height * blurAmount), 0.0f);
+    ApplyFilter(filter, quad, dst, src, blurScaleY);
+}
+
 
 int main()
 {
@@ -187,6 +209,8 @@ int main()
     Texture boxSpecTex = TextureImporter::importTexture("../img/container2_specular.png", t_specularmap);
     box.material.textures.push_back(boxDiffTex);
     box.material.textures.push_back(boxSpecTex);
+
+    auto quad = Shape::makeQuad();
 
     Model gameObj("../img/nanosuit/nanosuit.obj");
 
@@ -213,7 +237,7 @@ int main()
     lightShader.setVec3("lightColor", light.color);
     Shader simpleDepthShader(MY_SHADER_DEPTHMAP_VERT, MY_SHADER_DEPTHMAP_FRAG);
 
-    //Shader debugShader("debugShader.vert", "debugShader.frag");
+    Shader filter("GaussianBlur.vert", "GaussianBlur.frag");
 
     const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
     GLfloat borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -226,6 +250,8 @@ int main()
     for (auto& mesh : gameObj.meshes) {
         mesh.depthMap = depthMap_ptr;
     }
+
+    Texture bluredDepthMap(SHADOW_WIDTH, SHADOW_HEIGHT, GL_TEXTURE_2D, GL_LINEAR, GL_RGBA, GL_RG32F, true, GL_COLOR_ATTACHMENT0, t_depthmap, borderColor, texData);
 
     glEnable(GL_DEPTH_TEST);
     
@@ -264,14 +290,16 @@ int main()
 
         depthMap_ptr->bindToRenderTarget();
         glClear(GL_DEPTH_BUFFER_BIT);
-        // Configuration shader
 
+        // Configuration shader
         simpleDepthShader.use();
 		simpleDepthShader.setMat4(MY_MATRIX_VIEW, lightView);
 		simpleDepthShader.setMat4(MY_MATRIX_PROJ, lightProjection);
         glCullFace(GL_FRONT);
         renderScene(simpleDepthShader, floor, gameObj, box);
         glCullFace(GL_BACK);
+
+        blurDepthmap(filter, quad, *depthMap_ptr, bluredDepthMap, 0.75);
         
         // reset viewport
         openglWindow.bindToRenderTarget();

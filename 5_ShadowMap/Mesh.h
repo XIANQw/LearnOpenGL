@@ -17,13 +17,16 @@ public:
 	uint32_t VAO, VBO, EBO;
 	myMaterial::Material material;		
 	std::shared_ptr<Texture> depthMap = nullptr;
+	GLenum m_primitive;
 
 	
 	Mesh() = default;
 	Mesh(const std::vector<VertexType>& vertices,
-		const std::vector<uint32_t>& indices = std::vector<uint32_t>{}) :
+		const std::vector<uint32_t>& indices = std::vector<uint32_t>{},
+		GLenum primitive = GL_TRIANGLES) :
 		vertices(vertices),
-		indices(indices){
+		indices(indices),
+		m_primitive(primitive){
 		glGenVertexArrays(1, &VAO);
 		glGenBuffers(1, &VBO);
 		// 1. Binding VAO
@@ -82,10 +85,10 @@ public:
 		
 		glBindVertexArray(VAO);
 		if (indices.size() == 0) {
-			glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+			glDrawArrays(m_primitive, 0, vertices.size());
 		}
 		else {
-			glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+			glDrawElements(m_primitive, indices.size(), GL_UNSIGNED_INT, 0);
 		}
 	}
 

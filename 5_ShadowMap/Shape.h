@@ -98,12 +98,13 @@ namespace Shape {
 	};
 	Mesh<VertexTex> makeQuad() {
 		std::vector<VertexTex> vertexArr;
-		for (size_t i = 0; i < planeVertices.size(); i += VertexTex::layout.back()) {
-			glm::vec3 pos(planeVertices[i], planeVertices[i + 1], planeVertices[i + 2]);
-			glm::vec2 tex(planeVertices[i + 3], planeVertices[i + 4]);
+		for (size_t i = 0; i < quadVertices.size(); i += VertexTex::layout.back()) {
+			glm::vec3 pos(quadVertices[i], quadVertices[i + 1], quadVertices[i + 2]);
+			glm::vec2 tex(quadVertices[i + 3], quadVertices[i + 4]);
 			vertexArr.push_back(VertexTex(pos, tex));
 		}
-		return Mesh<VertexTex>(vertexArr);
+		std::vector<uint32_t>indices;
+		return Mesh<VertexTex>(vertexArr, indices, GL_TRIANGLE_STRIP);
 	}
 
 

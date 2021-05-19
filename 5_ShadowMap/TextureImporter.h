@@ -99,9 +99,6 @@ struct Texture {
 		glViewport(0, 0, m_width, m_height);
 	}
 
-	void ApplyFilter(const Shader& shader, const Texture& src, Texture& dst) {
-
-	}
 	
 };
 

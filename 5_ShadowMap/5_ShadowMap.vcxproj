@@ -38,6 +38,8 @@
     <None Include="3.3.shader.vert" />
     <None Include="debugShader.frag" />
     <None Include="debugShader.vert" />
+    <None Include="GaussianBlur.frag" />
+    <None Include="GaussianBlur.vert" />
     <None Include="lightShader.frag" />
     <None Include="lightShader.vert" />
     <None Include="genDepthmap.vert" />
