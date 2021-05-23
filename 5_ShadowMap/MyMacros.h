@@ -6,6 +6,8 @@
 
 #define MY_MODE_SHADOW "shadowmode"
 #define MY_MODE_FILTER "filtermode"
+#define MY_VAR_MINVARIANCE "minVariance"
+#define MY_VAR_LIGHTBLEEDREDUCTION "lightBleedReduction"
 
 // shader filename
 #define MY_SHADER_DEPTHMAP_VERT "genDepthmap.vert"

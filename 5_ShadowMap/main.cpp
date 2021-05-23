@@ -30,6 +30,10 @@ glm::vec3 currentBoxPos = glm::vec3(-1.0f, 0.0f, -1.0f);
 bool lightMoving = false;
 int lightButtonPressFrames = 0;
 
+float lightBleedReduction = 0.2;
+float minVariance = 0.00002;
+int lightBleedReductionAddButton = 0, lightBleedReductionSubButton = 0;
+
 void processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -79,6 +83,24 @@ void processInput(GLFWwindow* window)
 		if (lightButtonPressFrames > minimumPressFrames) {
             lightMoving = !lightMoving;
 			lightButtonPressFrames = 0;
+		}
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) {
+		lightBleedReductionAddButton++;
+		if (lightBleedReductionAddButton > minimumPressFrames) {
+			lightBleedReduction += 0.05;
+            lightBleedReduction = std::min(1.0f, lightBleedReduction);
+			lightBleedReductionAddButton = 0;
+		}
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS) {
+        lightBleedReductionSubButton++;
+		if (lightBleedReductionSubButton > minimumPressFrames) {
+			lightBleedReduction -= 0.05;
+            lightBleedReduction = std::max(0.0f, lightBleedReduction);
+            lightBleedReductionSubButton = 0;
 		}
 	}
 }
@@ -192,6 +214,7 @@ void blurDepthmap(Shader& filter, Mesh<VertexTex>& quad, Texture& src, Texture& 
 }
 
 
+
 int main()
 {
     OpenGLWindow openglWindow(WIDTH, HEIGHT, MY_TITLE);
@@ -230,7 +253,7 @@ int main()
     shader.setVec3(MY_POINTLIGHT_SPECULAR, light.specular);
     shader.setVec3(MY_POINTLIGHT_POS, light.position);
     shader.setVec3(MY_POINTLIGHT_COLOR, light.color);
-
+    shader.setFloat(MY_VAR_MINVARIANCE, minVariance);
 
     Shader lightShader(MY_SHADER_LIGHT_VERT, MY_SHADER_LIGHT_FRAG);
     lightShader.use();
@@ -303,6 +326,7 @@ int main()
         
         // reset viewport
         openglWindow.bindToRenderTarget();
+        glClearColor(0.1, 0.1, 0.1, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         /* 
@@ -333,6 +357,8 @@ int main()
         shader.setVec3(MY_CAMERA_POS, camera.cameraPos);
         shader.setVec3(MY_POINTLIGHT_POS, light.position);
 		shader.setMat4(MY_MATRIX_LIGHTSPACE, lightSpaceMatrix);
+		shader.setFloat(MY_VAR_LIGHTBLEEDREDUCTION, lightBleedReduction);
+		
         if (shadowModeChanges) {
             shader.setInt(MY_MODE_SHADOW, shadowmode);
             shadowModeChanges = false;
